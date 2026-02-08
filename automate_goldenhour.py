@@ -110,11 +110,11 @@ if __name__ == "__main__":
         sunset = get_sunset_time(d)
         if sunset:
             # Dynamic Window Calculation:
-            # Base logic: Start 2 hours before, end 1.5 hours after
+            # Base logic: Start 2.5 hours before, end 2 hours after
             # Constraint: Start at 5 PM at latest, end at 9 PM at latest
             
-            s_win = sunset - timedelta(minutes=120)
-            e_win = sunset + timedelta(minutes=90)
+            s_win = sunset - timedelta(minutes=150)
+            e_win = sunset + timedelta(minutes=120)
             
             # Capping: Corrected logic to ensure we respect your 5PM/9PM "at the latest" bounds
             target_5pm = SF_TZ.localize(datetime(d.year, d.month, d.day, 17, 0, 0))
