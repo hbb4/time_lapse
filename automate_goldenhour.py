@@ -97,24 +97,38 @@ if __name__ == "__main__":
     # Process requested test dates
     test_dates = [
         datetime(2025, 9, 10),
-        datetime(2025, 9, 11),
+        datetime(2025, 10, 20),
+        datetime(2025, 11, 10),
         datetime(2025, 12, 15)
     ]
     
     for d in test_dates:
         sunset = get_sunset_time(d)
         if sunset:
-            # Window: Sunset - 81m to Sunset + 69m (approx 3:30 to 6 PM for Dec 15)
-            start_win = sunset - timedelta(minutes=81)
-            end_win = sunset + timedelta(minutes=69)
+            # Dynamic Window Calculation:
+            # Base logic: Start 2 hours before, end 1.5 hours after
+            # Constraint: Start at 5 PM at latest, end at 9 PM at latest
             
-            frames = timeline.get_time_window(start_win, end_win)
+            s_win = sunset - timedelta(minutes=120)
+            e_win = sunset + timedelta(minutes=90)
+            
+            # Capping: Corrected logic to ensure we respect your 5PM/9PM "at the latest" bounds
+            target_5pm = SF_TZ.localize(datetime(d.year, d.month, d.day, 17, 0, 0))
+            target_9pm = SF_TZ.localize(datetime(d.year, d.month, d.day, 21, 0, 0))
+            
+            final_start = min(s_win, target_5pm)
+            final_end = min(e_win, target_9pm)
+            
+            frames = timeline.get_time_window(final_start, final_end)
             if frames:
                 out_name = os.path.join(out, f"{d.strftime('%Y-%m-%d')}_goldenhr_sunset.mp4")
-                if not os.path.exists(out_name):
-                    create_video_with_timestamps(frames, out_name)
-                    print(f"Created dramatic sunset: {out_name}")
-                else:
-                    print(f"Skip: {out_name}")
+                # Overwrite test files to show new expanded window
+                if os.path.exists(out_name): os.remove(out_name)
+                    
+                print(f"Creating dramatic sunset for {d.strftime('%b %d')}:")
+                print(f"  Sunset: {sunset.strftime('%H:%M')}")
+                print(f"  Window: {final_start.strftime('%H:%M')} -> {final_end.strftime('%H:%M')}")
+                
+                create_video_with_timestamps(frames, out_name)
             else:
                 print(f"No frames found for {d.strftime('%Y-%m-%d')} window.")
