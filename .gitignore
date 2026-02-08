@@ -1,0 +1,23 @@
+# Gitignore for Time Lapse Automation project
+
+# Outputs
+output_sunsets/
+output_overlapping/
+output_sep_test/
+output_v2/
+output_final/
+test_sunrise_sunset/
+test_sun.py
+sunrise_test_frame.jpg
+
+# Temporary files
+tmp_frames/
+tmp_processing/
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Shell logs
+*.log
