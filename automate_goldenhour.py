@@ -94,19 +94,20 @@ if __name__ == "__main__":
     root, out = sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "./output_golden"
     if not os.path.exists(out): os.makedirs(out)
     
-    # Process all frames from September 23, 2025 onwards
-    CUTOFF = SF_TZ.localize(datetime(2025, 9, 23))
+    # Process all frames from September 13, 2025 onwards
+    CUTOFF = SF_TZ.localize(datetime(2025, 9, 13))
     timeline = GlobalTimeline(root, start_cutoff=CUTOFF)
     
-    # Process requested test dates
-    test_dates = [
-        datetime(2025, 9, 10),
-        datetime(2025, 10, 20),
-        datetime(2025, 11, 10),
-        datetime(2025, 12, 15)
-    ]
+    if not timeline.frames:
+        print("No frames found.")
+        sys.exit(0)
+        
+    start_date = timeline.frames[0][0].date()
+    end_date = timeline.frames[-1][0].date()
     
-    for d in test_dates:
+    curr = start_date
+    while curr <= end_date:
+        d = datetime(curr.year, curr.month, curr.day)
         sunset = get_sunset_time(d)
         if sunset:
             # Dynamic Window Calculation:
@@ -116,7 +117,7 @@ if __name__ == "__main__":
             s_win = sunset - timedelta(minutes=150)
             e_win = sunset + timedelta(minutes=120)
             
-            # Capping: Corrected logic to ensure we respect your 5PM/9PM "at the latest" bounds
+            # Capping: Ensuring we respect the 5PM/9PM "at the latest" bounds
             target_5pm = SF_TZ.localize(datetime(d.year, d.month, d.day, 17, 0, 0))
             target_9pm = SF_TZ.localize(datetime(d.year, d.month, d.day, 21, 0, 0))
             
@@ -125,14 +126,15 @@ if __name__ == "__main__":
             
             frames = timeline.get_time_window(final_start, final_end)
             if frames:
-                out_name = os.path.join(out, f"{d.strftime('%Y-%m-%d')}_goldenhr_sunset.mp4")
-                # Overwrite test files to show new expanded window
-                if os.path.exists(out_name): os.remove(out_name)
-                    
-                print(f"Creating dramatic sunset for {d.strftime('%b %d')}:")
-                print(f"  Sunset: {sunset.strftime('%H:%M')}")
-                print(f"  Window: {final_start.strftime('%H:%M')} -> {final_end.strftime('%H:%M')}")
-                
-                create_video_with_timestamps(frames, out_name)
+                out_name = os.path.join(out, f"{curr.strftime('%Y-%m-%d')}_goldenhr.mp4")
+                if not os.path.exists(out_name):
+                    print(f"Creating dramatic sunset for {curr.strftime('%b %d')}:")
+                    print(f"  Sunset: {sunset.strftime('%H:%M')}")
+                    print(f"  Window: {final_start.strftime('%H:%M')} -> {final_end.strftime('%H:%M')}")
+                    create_video_with_timestamps(frames, out_name)
+                else:
+                    print(f"Skip: {out_name}")
             else:
-                print(f"No frames found for {d.strftime('%Y-%m-%d')} window.")
+                print(f"No frames found for {curr.strftime('%Y-%m-%d')} window.")
+        
+        curr += timedelta(days=1)
