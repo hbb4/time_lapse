@@ -158,30 +158,42 @@ if __name__ == "__main__":
     out = sys.argv[2] if len(sys.argv) > 2 else "./output_v2"
     if not os.path.exists(out): os.makedirs(out)
     
-    # Test for Sept 10, 2025
-    CUTOFF = SF_TZ.localize(datetime(2025, 9, 7)) # Start indexing from Sep 7 to be sure
+    # Full run starting March 20, 2025
+    CUTOFF = SF_TZ.localize(datetime(2025, 3, 20))
     timeline = GlobalTimeline(root, start_cutoff=CUTOFF)
     
-    # Test dates: Sep 10 and Sep 11
-    for day in [10, 11]:
-        d = datetime(2025, 9, day)
-        events = get_sun_events(d)
+    # Process the full timeline range
+    if not timeline.frames:
+        print("No frames found.")
+        sys.exit(0)
         
-        # Process Sunrise
+    start_date = timeline.frames[0][0].date()
+    end_date = timeline.frames[-1][0].date()
+    
+    curr = start_date
+    while curr <= end_date:
+        events = get_sun_events(curr)
+        
+        # Process Sunrise (Civil Dawn at 2s in)
         if events["civil_dawn"]:
-            # Minimal lead up: Start 2 seconds before civil_dawn
-            # Ratio 2/60 = 0.033
             frames = timeline.get_range(events["civil_dawn"], center_ratio=0.033)
             if frames:
-                out_name = os.path.join(out, f"2025-09-{day:02d}_sunrise_test.mp4")
-                create_video_with_timestamps(frames, out_name)
-                print(f"Created: {out_name}")
+                out_name = os.path.join(out, f"{curr.strftime('%Y-%m-%d')}_sunrise.mp4")
+                if not os.path.exists(out_name):
+                    create_video_with_timestamps(frames, out_name)
+                    print(f"Created: {out_name}")
+                else:
+                    print(f"Skip: {out_name}")
         
-        # Process Sunset
+        # Process Sunset (Centered)
         if events["sunset"]:
-            # Centered
             frames = timeline.get_range(events["sunset"], center_ratio=0.5)
             if frames:
-                out_name = os.path.join(out, f"2025-09-{day:02d}_sunset_test.mp4")
-                create_video_with_timestamps(frames, out_name)
-                print(f"Created: {out_name}")
+                out_name = os.path.join(out, f"{curr.strftime('%Y-%m-%d')}_sunset.mp4")
+                if not os.path.exists(out_name):
+                    create_video_with_timestamps(frames, out_name)
+                    print(f"Created: {out_name}")
+                else:
+                    print(f"Skip: {out_name}")
+        
+        curr += timedelta(days=1)
