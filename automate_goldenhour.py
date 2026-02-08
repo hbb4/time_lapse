@@ -75,9 +75,8 @@ def create_video_with_timestamps(frame_list, output_path):
     for i, (ts, path) in enumerate(frame_list):
         img = Image.open(path)
         
-        # Orientation change: on/after 2025-09-24, no rotation needed.
-        if ts.date() < datetime(2025, 9, 24).date():
-            img = img.transpose(Image.ROTATE_270)
+        # Always rotate 90 degrees clockwise as requested
+        img = img.transpose(Image.ROTATE_270)
         
         draw = ImageDraw.Draw(img)
         ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
@@ -94,8 +93,8 @@ if __name__ == "__main__":
     root, out = sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "./output_golden"
     if not os.path.exists(out): os.makedirs(out)
     
-    # Updated run starting September 24, 2025 (orientation changed here)
-    CUTOFF = SF_TZ.localize(datetime(2025, 9, 24))
+    # Updated run starting September 23, 2025
+    CUTOFF = SF_TZ.localize(datetime(2025, 9, 23))
     timeline = GlobalTimeline(root, start_cutoff=CUTOFF)
     
     # Process requested test dates
