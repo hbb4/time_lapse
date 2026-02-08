@@ -123,9 +123,11 @@ def create_video_with_timestamps(frame_list, output_path):
             
     for i, (ts, path) in enumerate(frame_list):
         img = Image.open(path)
-        # Apply rotation (default cw = 90 deg clockwise)
-        img = img.transpose(Image.ROTATE_270) # PIL's ROTATE_270 is 90 deg clockwise? No, ROTATE_270 is 90CW. Wait.
-        # Image.ROTATE_270 means rotate 270 deg counter-clockwise = 90 deg clockwise.
+        
+        # Orientation change: on/after 2025-09-24, no rotation needed.
+        # Before 2025-09-24, apply 90-degree clockwise (ROTATE_270).
+        if ts.date() < datetime(2025, 9, 24).date():
+            img = img.transpose(Image.ROTATE_270)
         
         draw = ImageDraw.Draw(img)
         ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
@@ -158,8 +160,8 @@ if __name__ == "__main__":
     out = sys.argv[2] if len(sys.argv) > 2 else "./output_v2"
     if not os.path.exists(out): os.makedirs(out)
     
-    # Full run starting September 11, 2025
-    CUTOFF = SF_TZ.localize(datetime(2025, 9, 11))
+    # Full run starting September 24, 2025 (orientation changed here)
+    CUTOFF = SF_TZ.localize(datetime(2025, 9, 24))
     timeline = GlobalTimeline(root, start_cutoff=CUTOFF)
     
     # Process the full timeline range
