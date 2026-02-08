@@ -158,8 +158,8 @@ if __name__ == "__main__":
     out = sys.argv[2] if len(sys.argv) > 2 else "./output_v2"
     if not os.path.exists(out): os.makedirs(out)
     
-    # Full run starting March 20, 2025
-    CUTOFF = SF_TZ.localize(datetime(2025, 3, 20))
+    # Full run starting September 11, 2025
+    CUTOFF = SF_TZ.localize(datetime(2025, 9, 11))
     timeline = GlobalTimeline(root, start_cutoff=CUTOFF)
     
     # Process the full timeline range
