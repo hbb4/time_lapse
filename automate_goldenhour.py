@@ -94,8 +94,8 @@ if __name__ == "__main__":
     root, out = sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "./output_golden"
     if not os.path.exists(out): os.makedirs(out)
     
-    # Process all frames from March 20, 2025 onwards
-    CUTOFF = SF_TZ.localize(datetime(2025, 3, 20))
+    # Process all frames from September 23, 2025 onwards
+    CUTOFF = SF_TZ.localize(datetime(2025, 9, 23))
     timeline = GlobalTimeline(root, start_cutoff=CUTOFF)
     
     # Process requested test dates
