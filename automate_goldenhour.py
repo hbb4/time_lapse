@@ -11,8 +11,8 @@ LATITUDE = 37.791667734079596
 LONGITUDE = -122.41549323195979
 SF_TZ = pytz.timezone("America/Los_Angeles")
 
-def get_sunset_time(date):
-    """Calculates sunset for SF."""
+def get_sun_time(date, zenith_deg=90.833):
+    """Calculates sun event time for SF based on zenith."""
     day_of_year = date.timetuple().tm_yday
     gamma = (2 * math.pi / 365.0) * (day_of_year - 1)
     eqtime = 229.18 * (0.000075 + 0.001868 * math.cos(gamma) - 0.032077 * math.sin(gamma) \
@@ -21,7 +21,7 @@ def get_sunset_time(date):
            - 0.006758 * math.cos(2 * gamma) + 0.000907 * math.sin(2 * gamma) \
            - 0.002697 * math.cos(3 * gamma) + 0.00148 * math.sin(3 * gamma)
     rad_lat = math.radians(LATITUDE)
-    zenith = math.radians(90.833)
+    zenith = math.radians(zenith_deg)
     cos_ha = (math.cos(zenith) / (math.cos(rad_lat) * math.cos(decl))) - (math.tan(rad_lat) * math.tan(decl))
     if cos_ha > 1 or cos_ha < -1: return None
     ha_deg = math.degrees(math.acos(cos_ha))
@@ -108,21 +108,19 @@ if __name__ == "__main__":
     curr = start_date
     while curr <= end_date:
         d = datetime(curr.year, curr.month, curr.day)
-        sunset = get_sunset_time(d)
-        if sunset:
+        sunset = get_sun_time(d, 90.833)
+        nautical_dusk = get_sun_time(d, 102.0)
+        
+        if sunset and nautical_dusk:
             # Dynamic Window Calculation:
-            # Base logic: Start 2.5 hours before, end 2 hours after
-            # Constraint: Start at 5 PM at latest, end at 9 PM at latest
+            # Start: 2.5 hours before sunset, but 5 PM at the latest.
+            # End: Exactly Nautical Dusk (when last light goes away).
             
             s_win = sunset - timedelta(minutes=150)
-            e_win = sunset + timedelta(minutes=120)
-            
-            # Capping: Ensuring we respect the 5PM/9PM "at the latest" bounds
             target_5pm = SF_TZ.localize(datetime(d.year, d.month, d.day, 17, 0, 0))
-            target_9pm = SF_TZ.localize(datetime(d.year, d.month, d.day, 21, 0, 0))
             
             final_start = min(s_win, target_5pm)
-            final_end = min(e_win, target_9pm)
+            final_end = nautical_dusk
             
             frames = timeline.get_time_window(final_start, final_end)
             if frames:
