@@ -105,29 +105,45 @@ if __name__ == "__main__":
     root, out = sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "./output_rewind"
     if not os.path.exists(out): os.makedirs(out)
     
-    # Test case: Dec 15, 2025
-    TEST_DAY = datetime(2025, 12, 15)
-    CUTOFF = SF_TZ.localize(TEST_DAY - timedelta(days=2))
+    # Process all frames from September 13, 2025 onwards
+    CUTOFF = SF_TZ.localize(datetime(2025, 9, 13))
     timeline = GlobalTimeline(root, start_cutoff=CUTOFF)
     
-    sunset = get_sun_time(TEST_DAY, 90.833)
-    nautical_dusk = get_sun_time(TEST_DAY, 102.0)
+    if not timeline.frames:
+        print("No frames found.")
+        sys.exit(0)
+        
+    start_date = timeline.frames[0][0].date()
+    end_date = timeline.frames[-1][0].date()
     
-    if sunset and nautical_dusk:
-        # Dynamic Window Calculation:
-        # Start: 2.5 hours before sunset, but 5 PM at the latest.
-        # End: Exactly Nautical Dusk (when last light goes away).
+    curr = start_date
+    while curr <= end_date:
+        d = datetime(curr.year, curr.month, curr.day)
+        sunset = get_sun_time(d, 90.833)
+        nautical_dusk = get_sun_time(d, 102.0)
         
-        s_win = sunset - timedelta(minutes=150)
-        target_5pm = SF_TZ.localize(datetime(TEST_DAY.year, TEST_DAY.month, TEST_DAY.day, 17, 0, 0))
+        if sunset and nautical_dusk:
+            # Dynamic Window Calculation:
+            # Start: 2.5 hours before sunset, but 5 PM at the latest.
+            # End: Exactly Nautical Dusk (when last light goes away).
+            
+            s_win = sunset - timedelta(minutes=150)
+            target_5pm = SF_TZ.localize(datetime(d.year, d.month, d.day, 17, 0, 0))
+            
+            final_start = min(s_win, target_5pm)
+            final_end = nautical_dusk
+            
+            frames = timeline.get_time_window(final_start, final_end)
+            if frames:
+                out_name = os.path.join(out, f"{curr.strftime('%Y-%m-%d')}_goldenhr_rewind.mp4")
+                if not os.path.exists(out_name):
+                    print(f"Creating rewind sunset for {curr.strftime('%b %d')}:")
+                    print(f"  Sunset: {sunset.strftime('%H:%M')}")
+                    print(f"  Window: {final_start.strftime('%H:%M')} -> {final_end.strftime('%H:%M')}")
+                    create_video_with_rewind(frames, out_name)
+                else:
+                    print(f"Skip: {out_name}")
+            else:
+                print(f"No frames found for {curr.strftime('%Y-%m-%d')} window.")
         
-        final_start = min(s_win, target_5pm)
-        final_end = nautical_dusk
-        
-        frames = timeline.get_time_window(final_start, final_end)
-        if frames:
-            out_name = os.path.join(out, f"2025-12-15_goldenhr_rewind.mp4")
-            create_video_with_rewind(frames, out_name)
-            print(f"Created rewind video: {out_name}")
-        else:
-            print("No frames found for Dec 15 window.")
+        curr += timedelta(days=1)
