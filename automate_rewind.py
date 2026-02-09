@@ -131,7 +131,8 @@ if __name__ == "__main__":
             target_5pm = SF_TZ.localize(datetime(d.year, d.month, d.day, 17, 0, 0))
             
             final_start = min(s_win, target_5pm)
-            final_end = nautical_dusk
+            # End 40 minutes after Nautical Dusk to ensure total darkness
+            final_end = nautical_dusk + timedelta(minutes=40)
             
             frames = timeline.get_time_window(final_start, final_end)
             if frames:
