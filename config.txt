@@ -1,0 +1,8 @@
+# Time-lapse batch configuration
+# Format: date,folder,start_frame,end_frame,fps,rotate
+
+# 2025-03-19,/Volumes/CORSAIR/ATLI_videos_and_stills/TLST05B01403_250319075639,1,4000,30,none
+2025-03-20,/Volumes/CORSAIR/ATLI_videos_and_stills/TLST05B01403_250320101854,1,6400,30,none
+2025-03-17,/Volumes/CORSAIR/ATLI_videos_and_stills/TLST05B01403_250321224906,1000,3450,30,none
+2025-04-09,/Volumes/CORSAIR/ATLI_videos_and_stills/TLST05B01403_250409145029,1,1122,30,none
+2025-04-10,/Volumes/CORSAIR/ATLI_videos_and_stills/TLST05B01403_250409145029,1650,5969,30,none
