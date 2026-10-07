@@ -13,6 +13,20 @@ PROXY_DIR = OUT_ROOT / "proxies"
 PREVIEW_DIR = OUT_ROOT / "previews"
 INVENTORY_CSV = Path(__file__).with_name("frame_folders.csv")
 
+# Indoor time lapses (plants), not the window view: left out of analysis, the clock
+# estimate and clips. Nothing is deleted; these folders are just skipped.
+EXCLUDE_FOLDERS = {
+    "TLST05B01403_250607094832",  # 2025-06-07 to 06-10, cactus on a table
+    "TLST05B01403_250613023928",  # 2025-06-13 to 09-05, grow tent, one frame per 15 minutes
+}
+
+
+def not_excluded(column="folder"):
+    """SQL condition that leaves out frames from EXCLUDE_FOLDERS."""
+    if not EXCLUDE_FOLDERS:
+        return "1"
+    return f"{column} NOT IN ({', '.join(repr(f) for f in sorted(EXCLUDE_FOLDERS))})"
+
 # Camera is mounted on its side: raw frames are 2688x1520 with the sky on the left.
 # Rotating 90 degrees clockwise gives an upright 1520x2688 frame.
 ROTATE_CW = True

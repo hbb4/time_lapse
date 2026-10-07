@@ -2,7 +2,7 @@
 """
 Phase 1 analysis pass: one read of every frame in a set of camera folders, writing
 
-  * a row per frame in pipeline.db (EXIF time, sun position, brightness, colour,
+  * a row per frame in pipeline.db (time corrected for the camera's clock, sun position, brightness, colour,
     frame-to-frame change, camera shift, sharpness), and
   * a proxy tar per folder: upright 380x672 JPEGs, small enough to preview and
     re-analyse without touching the full-resolution frames again.
@@ -31,8 +31,8 @@ import numpy as np
 from PIL import Image
 
 from . import config
+from .clock import Clock
 from .frames import iter_frames, jpeg_bytes, locate
-from .sun import sun_position
 
 GRID = 16  # frame-to-frame change is measured on a GRID x GRID block-mean image
 
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS frames (
   sky_luma REAL, sky_r REAL, sky_g REAL, sky_b REAL, sky_sat REAL, ground_luma REAL,
   sharpness REAL, diff_mean REAL, diff_max REAL, diff_sky REAL,
   dx_prev REAL, dy_prev REAL, peak_prev REAL, dx_ref REAL, dy_ref REAL, peak_ref REAL,
-  error TEXT,
+  error TEXT, t_camera TEXT,
   PRIMARY KEY (folder, n)
 );
 CREATE INDEX IF NOT EXISTS frames_time ON frames (t_utc);
@@ -56,7 +56,7 @@ CREATE INDEX IF NOT EXISTS frames_time ON frames (t_utc);
 FRAME_COLS = ["folder", "n", "t_local", "t_utc", "sun_elev", "sun_az", "luma", "p05", "p50", "p95",
               "sky_luma", "sky_r", "sky_g", "sky_b", "sky_sat", "ground_luma", "sharpness",
               "diff_mean", "diff_max", "diff_sky", "dx_prev", "dy_prev", "peak_prev",
-              "dx_ref", "dy_ref", "peak_ref", "error"]
+              "dx_ref", "dy_ref", "peak_ref", "error", "t_camera"]
 
 
 def open_db(path=None):
@@ -64,6 +64,11 @@ def open_db(path=None):
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path)
     db.executescript(SCHEMA)
+    if "t_camera" not in [r[1] for r in db.execute("PRAGMA table_info(frames)")]:
+        # older index: until now t_local held the camera's own (EXIF) time
+        db.execute("ALTER TABLE frames ADD COLUMN t_camera TEXT")
+        db.execute("UPDATE frames SET t_camera = t_local")
+        db.commit()
     return db
 
 
@@ -103,10 +108,7 @@ def analyse_frame(args):
         sky, ground = rgb[:sky_rows], y[H - ground_rows:]
 
         if t is not None:
-            aware = t.replace(tzinfo=config.TZ)
-            out["t_local"] = t.isoformat(sep=" ")
-            out["t_utc"] = aware.timestamp()
-            out["sun_elev"], out["sun_az"] = sun_position(aware)
+            out["t_camera"] = t.isoformat(sep=" ")  # the camera's clock; corrected in process_folder
         out["luma"] = float(y.mean())
         out["p05"], out["p50"], out["p95"] = (float(v) for v in np.percentile(y[::2, ::2], [5, 50, 95]))
         out["sky_luma"] = float(y[:sky_rows].mean())
@@ -152,7 +154,10 @@ def folders_for(args):
     """(folder, sequence_id) pairs to analyse; sequence ids come from the inventory CSV if present."""
     rows = []
     if config.INVENTORY_CSV.is_file():
-        rows = list(csv.DictReader(open(config.INVENTORY_CSV)))
+        rows = [r for r in csv.DictReader(open(config.INVENTORY_CSV)) if r["folder"] not in config.EXCLUDE_FOLDERS]
+    for f in args.folders or []:
+        if f in config.EXCLUDE_FOLDERS:
+            sys.exit(f"{f} is in EXCLUDE_FOLDERS (config.py): not the window view")
     if args.folders:
         seq = {r["folder"]: int(r["sequence_id"]) for r in rows}
         return [(f, args.sequence_id or seq.get(f)) for f in args.folders]
@@ -200,12 +205,19 @@ def process_folder(db, pool, tracker, folder, seq_id, args):
     count = errors = missing = 0
     t_first = t_last = None
     inflight, batch = [], []
+    clock = Clock(db)
+    if not clock.stretches:
+        print("  clock: no offsets measured yet, trusting the camera's clock "
+              "(run pipeline.clock scan, then apply)", flush=True)
     window = args.workers * 4
 
     def finish_one(tar):
         nonlocal count, errors, missing, t_first, t_last
         row = inflight.pop(0).result()
         proxy = row.pop("proxy", None)
+        if row.get("t_camera"):  # camera time to real local time, using the offsets from pipeline.clock
+            row["t_local"], row["t_utc"], row["sun_elev"], row["sun_az"] = clock.convert(
+                datetime.fromisoformat(row["t_camera"]))
         tracker.update(row)
         if proxy is not None:
             info = tarfile.TarInfo(f"{folder}/TLS_{row['n']:09d}.jpg")

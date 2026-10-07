@@ -1,0 +1,89 @@
+# Clip recipes. Each [[recipe]] is tried on every day of analysed footage, scored,
+# and ranked; you review samples and keep the ones you like.
+#
+# start / end: an anchor plus an offset in minutes. Anchors: dawn, sunrise, noon,
+#   sunset, dusk (from the sun's position that day) or a clock time like "06:30".
+#   "sunset-90" is 90 minutes before sunset. A window that ends before it starts
+#   (a night clip) runs into the next morning.
+# seconds_per_frame: 0 plays every frame the camera shot, one per video frame, like the
+#   camera's own mp4. The shot interval then sets the pace: at 30 fps, footage shot
+#   every 15 s turns one real hour into 8 s of video, and footage shot every 5 s into 24 s.
+#   A number instead means real seconds per video frame (30 uses every other frame of
+#   15 s footage); frames are skipped whole, never mixed.
+# blend: false by default. true lets a recipe ask for fewer seconds_per_frame than the
+#   camera shot by cross-fading neighbouring frames; slower, but moving things can ghost.
+# max_speedup: 1 keeps the speed constant. Above 1, quiet stretches (little sky
+#   motion) play up to this many times faster by skipping whole frames, ramping
+#   smoothly; busy stretches always play at normal speed. Keep it low for smooth motion.
+# score: what makes a day good for this recipe: colour (vivid, warm sky),
+#   clouds (textured or broken cloud that is moving; flat fog and clear sky score low),
+#   burnoff (the sky going from grey to blue during the window),
+#   motion (movement in one part of the frame, e.g. the crane),
+#   night (clouds or fog moving at night).
+# min_score / top: which ranked days get samples and renders (score is 0-100,
+#   ranked within the recipe; top = 0 means no limit).
+# aspect: "9:16" (vertical) or "16:9". pan: crop position at the start and end of
+#   the clip, 0 = top (or left) to 1 = bottom (or right); [0.5, 0.5] holds still.
+#   9:16 uses nearly the whole upright frame, so pan matters mostly for 16:9.
+
+[defaults]
+fps = 30
+seconds_per_frame = 0
+blend = false
+max_speedup = 1.0
+aspect = "9:16"
+pan = [0.5, 0.5]
+timestamp = true
+deflicker = true
+min_score = 0
+top = 0
+
+[[recipe]]
+name = "sunset"
+start = "sunset-120"
+end = "sunset+45"
+score = "colour"
+
+[[recipe]]
+name = "midday"
+start = "noon-150"
+end = "noon+150"
+max_speedup = 2
+score = "clouds"
+
+[[recipe]]
+name = "dawn_to_midday"
+start = "sunrise-20"
+end = "noon"
+seconds_per_frame = 30
+max_speedup = 2
+score = "clouds"
+
+# Fog or low cloud clearing to blue sky, shown quickly.
+[[recipe]]
+name = "burnoff"
+start = "sunrise+30"
+end = "noon+60"
+seconds_per_frame = 30
+max_speedup = 3
+score = "burnoff"
+min_score = 60
+
+[[recipe]]
+name = "night"
+start = "dusk+15"
+end = "dawn-15"
+seconds_per_frame = 45
+max_speedup = 3
+score = "night"
+min_score = 60
+
+# A horizontal version of the sunset, panning from the sky down to the city.
+# Uncomment to use.
+# [[recipe]]
+# name = "sunset_wide"
+# start = "sunset-90"
+# end = "sunset+40"
+# score = "colour"
+# aspect = "16:9"
+# pan = [0.15, 0.55]

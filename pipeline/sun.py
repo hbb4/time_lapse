@@ -41,3 +41,46 @@ def sun_position(when_utc: datetime, lat=LATITUDE, lon=LONGITUDE):
     az = math.degrees(math.atan2(math.sin(har),
                                  math.cos(har) * math.sin(latr) - math.tan(decl) * math.cos(latr))) + 180
     return elev, az % 360
+
+
+def sun_events(day, tz):
+    """Local times of the sun events used by clip recipes on one calendar day.
+
+    Keys: dawn (civil, -6 deg rising), sunrise (-0.833 rising), noon (highest),
+    sunset (-0.833 setting), dusk (civil, -6 deg setting). Missing if the sun
+    never crosses that angle that day (never the case in San Francisco).
+    """
+    from datetime import datetime, timedelta
+
+    start = datetime(day.year, day.month, day.day, tzinfo=tz)
+    step = timedelta(minutes=10)
+    times = [start + i * step for i in range(24 * 6 + 1)]
+    elev = [sun_position(t)[0] for t in times]
+
+    def refine(a, b, angle):
+        for _ in range(30):  # bisection to well under a second
+            mid = a + (b - a) / 2
+            if (sun_position(mid)[0] - angle) * (sun_position(a)[0] - angle) <= 0:
+                b = mid
+            else:
+                a = mid
+        return a + (b - a) / 2
+
+    events = {}
+    for name, angle, rising in (("dawn", -6, True), ("sunrise", -0.833, True),
+                                ("sunset", -0.833, False), ("dusk", -6, False)):
+        for i in range(len(times) - 1):
+            e0, e1 = elev[i] - angle, elev[i + 1] - angle
+            if (rising and e0 < 0 <= e1) or (not rising and e0 >= 0 > e1):
+                events[name] = refine(times[i], times[i + 1], angle)
+                break
+    i = max(range(len(elev)), key=elev.__getitem__)
+    lo, hi = times[max(i - 1, 0)], times[min(i + 1, len(times) - 1)]
+    for _ in range(30):  # ternary search for the peak
+        m1, m2 = lo + (hi - lo) / 3, lo + 2 * (hi - lo) / 3
+        if sun_position(m1)[0] < sun_position(m2)[0]:
+            lo = m1
+        else:
+            hi = m2
+    events["noon"] = lo + (hi - lo) / 2
+    return events
