@@ -21,3 +21,6 @@ __pycache__/
 
 # Shell logs
 *.log
+
+# Local virtual environment
+.venv/
