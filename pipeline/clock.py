@@ -112,7 +112,7 @@ class Clock:
 
 def measure(args):
     """Worker: EXIF time and sky brightness of one frame, from a small draft decode."""
-    n, kind, data = args
+    n, kind, data, upright = args
     try:
         im = Image.open(io.BytesIO(jpeg_bytes(kind, data)))
         exif = im.getexif()
@@ -121,7 +121,7 @@ def measure(args):
         w, h = im.size
         im.draft("L", (w // 8, h // 8))
         im = im.convert("L")
-        if config.ROTATE_CW:
+        if config.ROTATE_CW and not upright:
             im = im.transpose(Image.Transpose.ROTATE_270)
         y = np.asarray(im, dtype=np.float32) / 255.0
         return n, t, float(y[:int(y.shape[0] * config.SKY_FRACTION)].mean())
@@ -182,7 +182,8 @@ def scan_folder(db, pool, folder):
                 return
             # the shot interval, from two frames a little apart, sets how sparsely to sample
             k = min(20, len(entries) - 1)
-            a, b = (measure((n, *read())) for n, read in (entries[0], entries[k]))
+            upright = folder in config.UPRIGHT_FOLDERS
+            a, b = (measure((n, *read(), upright)) for n, read in (entries[0], entries[k]))
             interval = 15.0
             if a[1] and b[1]:
                 span = (datetime.fromisoformat(b[1]) - datetime.fromisoformat(a[1])).total_seconds()
@@ -191,7 +192,7 @@ def scan_folder(db, pool, folder):
             samples, inflight = [], []
             for n, read in picked:
                 try:
-                    inflight.append(pool.submit(measure, (n, *read())))
+                    inflight.append(pool.submit(measure, (n, *read(), upright)))
                 except OSError:  # a loose frame deleted by reclaim_space.sh while scanning
                     samples.append((n, None, None))
                 while len(inflight) > 32:

@@ -174,7 +174,9 @@ def render_one(db, pool, clip_id, proxy, workers):
         for i, ((kind, data), other, weight) in enumerate(planned_frames(frames, proxy)):
             pan = p0 + (p1 - p0) * smoothstep(i / last)
             stamp = frames[i][2][:16] if s.get("timestamp", True) else None
-            inflight.append(pool.submit(process_frame, (kind, data, other, weight, proxy, gains[i], pan, s["aspect"], size, stamp)))
+            upright = proxy or frames[i][0] in config.UPRIGHT_FOLDERS
+            inflight.append(pool.submit(process_frame, (kind, data, other, weight, upright, gains[i], pan,
+                                                        s["aspect"], size, stamp)))
             while len(inflight) > workers * 3:
                 ff.stdin.write(inflight.pop(0).result())
         while inflight:

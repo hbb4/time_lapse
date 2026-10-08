@@ -94,7 +94,7 @@ def analyse_frame(args):
         w, h = im.size
         im.draft("RGB", (w // config.PROXY_SCALE, h // config.PROXY_SCALE))
         im = im.convert("RGB")
-        if config.ROTATE_CW:
+        if config.ROTATE_CW and folder not in config.UPRIGHT_FOLDERS:
             im = im.transpose(Image.Transpose.ROTATE_270)
         buf = io.BytesIO()
         im.save(buf, "JPEG", quality=config.PROXY_QUALITY)

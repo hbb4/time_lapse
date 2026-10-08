@@ -24,3 +24,6 @@ __pycache__/
 
 # Local virtual environment
 .venv/
+
+# Python bytecode
+__pycache__/

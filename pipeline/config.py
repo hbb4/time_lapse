@@ -30,6 +30,10 @@ def not_excluded(column="folder"):
 # Camera is mounted on its side: raw frames are 2688x1520 with the sky on the left.
 # Rotating 90 degrees clockwise gives an upright 1520x2688 frame.
 ROTATE_CW = True
+# Folders shot with the camera's own rotation on: frames are already upright 1520x2688.
+UPRIGHT_FOLDERS = {
+    "TLST05B01403_250924074942",  # 2025-09-24 to 09-29
+}
 PROXY_SCALE = 4          # JPEG draft decode at 1/4: 380x672 upright
 PROXY_QUALITY = 85
 SKY_FRACTION = 0.40      # top 40% of the upright frame is sky

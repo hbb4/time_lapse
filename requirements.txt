@@ -1,2 +1,4 @@
 numpy
 Pillow
+# captions/ also needs ffmpeg on PATH; whisperx or torchaudio may replace pocketsphinx later
+pocketsphinx

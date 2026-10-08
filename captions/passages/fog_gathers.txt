@@ -1,0 +1,5 @@
+@style serif
+@move push
+@aspect 9x16
+
+The fog does not arrive all at once. It *gathers* at the edges of the {hills}hills, {rooftop}slowly, the way a thought *gathers,* until the tower is only a rumor of red light. [stairs]And then, without asking anyone, the evening lets it go.
