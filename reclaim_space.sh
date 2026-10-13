@@ -15,9 +15,13 @@
 # Stops on any verification failure, checksum mismatch, or lack of space.
 # Empty folders and the camera's .mp4 files are left alone.
 #
+# Runs politely: half the cores by default (--workers N to change) and at
+# lowered CPU priority (NICE, default 10; NICE=0 for normal priority).
+#
 # Usage:
 #   ./reclaim_space.sh --dry-run        list what would be done
 #   ./reclaim_space.sh --limit 1        process only the next folder
+#   ./reclaim_space.sh --workers 3      use 3 parallel cjxl/djxl jobs
 #   caffeinate -i ./reclaim_space.sh    process everything
 
 set -u -o pipefail
@@ -26,6 +30,7 @@ ROOT="${ROOT:-/Volumes/CORSAIR/ATLI_videos_and_stills}"
 LOCAL_DIR="${LOCAL_DIR:-$HOME/time_lapse_packed}"
 LOCAL_MIN_FREE_MB="${LOCAL_MIN_FREE_MB:-5120}"   # keep this much free on the internal disk
 DRIVE_MIN_FREE_MB="${DRIVE_MIN_FREE_MB:-512}"    # keep this much free on the frame drive
+NICE="${NICE:-10}"                               # niceness for this script and everything it runs
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PACK="$HERE/pack_frames.py"
@@ -34,14 +39,19 @@ PACKED="$ROOT/_packed"
 
 DRY_RUN=0
 LIMIT=0
+WORKERS=$(( $(sysctl -n hw.ncpu 2>/dev/null || echo 4) / 2 ))   # half the cores
+[ "$WORKERS" -ge 1 ] || WORKERS=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --dry-run) DRY_RUN=1 ;;
         --limit) LIMIT="$2"; shift ;;
+        --workers) WORKERS="${2:-}"; shift ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
     shift
 done
+
+case "$WORKERS" in ''|*[!0-9]*|0) echo "--workers needs a positive integer" >&2; exit 2 ;; esac
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$LOG"; }
 die() { log "STOP: $*"; exit 1; }
@@ -49,7 +59,7 @@ free_mb() { df -m "$1" | awk 'NR==2 {print $4}'; }
 size_mb() { echo $(( ($(stat -f %z "$1") + 1048575) / 1048576 )); }
 sha() { shasum -a 256 "$1" | awk '{print $1}'; }
 count_frames() { ls -f "$1" 2>/dev/null | grep -c '^TLS_.*\.jpg$'; }
-run_pack() { python3 "$PACK" "$@" 2>&1 | tee -a "$LOG"; return "${PIPESTATUS[0]}"; }
+run_pack() { python3 "$PACK" "$@" --workers "$WORKERS" 2>&1 | tee -a "$LOG"; return "${PIPESTATUS[0]}"; }
 
 # Copy a locally packed tar onto the drive, confirm the checksum, drop the local copy.
 move_to_drive() {
@@ -128,7 +138,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
 fi
 
 mkdir -p "$LOCAL_DIR/tmp" "$PACKED"
-log "=== reclaim_space start: ${#todo[@]} folders to process ==="
+renice -n "$NICE" -p $$ >/dev/null 2>&1 || true   # inherited by pack_frames.py, cjxl, djxl, cp, shasum
+log "=== reclaim_space start: ${#todo[@]} folders to process, $WORKERS workers, nice $NICE ==="
 done_count=0
 for name in ${todo[@]+"${todo[@]}"}; do
     process "$name"
