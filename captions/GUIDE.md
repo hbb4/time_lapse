@@ -246,8 +246,22 @@ Built: the end card (`end_card`), safe area, cover and contrast are in section 4
 Not built yet:
 
 - **Auto attribution:** "— Author, Title" written over the rewind from captions.csv, no card needed.
-- **Subtitle file (.srt):** written next to each clip from the word timings, for YouTube and accessibility.
-- **Loudness:** normalize to about −14 LUFS so every clip plays at the same level on the platforms.
+- **Subtitle file (.srt):** written next to each clip from the word timings, for YouTube and accessibility. (Done for videos captioned with `burn.py`, section 10; not yet for `render.py` clips.)
+- **Loudness:** normalize to about −14 LUFS so every clip plays at the same level on the platforms. (Done in `burn.py`; not yet in `render.py`.)
 - **Room tone:** a quiet city / window ambience bed under the voice.
 - **Chapters for long form:** YouTube chapter markers at stanza or section breaks.
 - **Variations (on hold):** render one passage two or three ways (style, day, music) to compare.
+
+## 10. Captioning any video: burn.py
+
+For a video that is not one of these time-lapse renders (a talking clip, a screen recording, anything with speech), `burn.py`
+does the whole job without a recording or a passage file: Whisper word timings, an automatic style and stressed words, optional
+silence cuts and jump-cut zooms, music ducking, loudness, a cover and an `.srt`.
+
+```
+.venv/bin/python captions/burn.py in.mp4 out.mp4 --edit punchy --cut-silence
+.venv/bin/python captions/burn.py in.mp4 out.mp4 --text captions/passages/p042.txt   # known text, audio timings
+```
+
+It uses the same caption engine as `render.py` (styles, layout effects, safe area, contrast shadow), plus two looks, `hype` and `clean`,
+that `render.py --style` can use too. `python -m publish ship` runs it and then posts the result; see `publish/README.md`.

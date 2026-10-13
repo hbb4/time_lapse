@@ -294,11 +294,15 @@ def draw_words(size, placed, ph, t, shadow_blur, s=None, bright=0.0):
         active = w["start"] <= t < w["end"] + 0.08 and out == 0
         col = s["stress"] if solo else (s["active"] if active else s["color"])
         y = base + dy - 22 * out * u                               # drift up on exit
+        sw = int(round(s.get("stroke", 0) * u))
+        ink = dict(stroke_width=sw, stroke_fill=(0, 0, 0, alpha)) if sw else {}
+        if active and s.get("lift") and not solo:                  # the spoken word swells a little
+            f = f.font_variant(size=int(f.size * (1 + s["lift"] * min(1, (t - w["start"]) / 0.08))))
         if enter == "type" and not solo:                           # anchor left so letters don't shift
             x = cx - d.textlength(shown(w, s), font=f) / 2
-            d.text((x, y), text, font=f, fill=col + (alpha,), anchor="ls")
+            d.text((x, y), text, font=f, fill=col + (alpha,), anchor="ls", **ink)
         else:
-            d.text((cx, y), text, font=f, fill=col + (alpha,), anchor="ms")
+            d.text((cx, y), text, font=f, fill=col + (alpha,), anchor="ms", **ink)
             if solo and s["glow"]:
                 g.text((cx, y), text, font=f, fill=s["stress"] + (int(alpha * 0.8),), anchor="ms")
     base_img = Image.new("RGBA", size, (0, 0, 0, 0))
@@ -694,6 +698,15 @@ def apply_directives(a, ap):
             if act.choices and getattr(a, act.dest) not in act.choices:
                 raise SystemExit(f"@{k} {v}: choose from {', '.join(map(str, act.choices))}")
 
+def style_for(aspect, name, seed, fx_every=None):
+    """The style dict for a clip: styles.get plus the long-form (16x9) adjustments and an fx_every override."""
+    s = styles.get(name, seed=seed)
+    if aspect == "16x9":         # long form: wider, smaller lines lower in the frame, more words per line
+        s.update(size=s["size"] * 0.7, big=s["big"] * 0.7, max_chars=int(s["max_chars"] * 2),
+                 max_words=9, y=0.8, stress_size=s["stress_size"] * 0.9, fx_every=s["fx_every"] * 1.6)
+    if fx_every is not None: s["fx_every"] = fx_every
+    return s
+
 def main(a):
     global W, H, STYLE, SAFE, CONTRAST
     W, H = (1920, 1080) if a.aspect == "16x9" else (1080, 1920)
@@ -703,11 +716,7 @@ def main(a):
     if a.end_card:
         a.end_card = a.end_card.replace("{aspect}", a.aspect)   # card_{aspect}.png -> card_9x16.png / card_16x9.png
         if not os.path.exists(a.end_card): raise SystemExit(f"end card not found: {a.end_card}")
-    STYLE = styles.get(a.style, seed=os.path.basename(a.out).rsplit("_", 1)[0])
-    if a.aspect == "16x9":       # long form: wider, smaller lines lower in the frame, more words per line
-        STYLE.update(size=STYLE["size"] * 0.7, big=STYLE["big"] * 0.7, max_chars=int(STYLE["max_chars"] * 2),
-                     max_words=9, y=0.8, stress_size=STYLE["stress_size"] * 0.9, fx_every=STYLE["fx_every"] * 1.6)
-    if a.fx_every is not None: STYLE["fx_every"] = a.fx_every
+    STYLE = style_for(a.aspect, a.style, os.path.basename(a.out).rsplit("_", 1)[0], a.fx_every)
     print(f"caption style: {STYLE['name']}")
     if a.words:
         words = json.load(open(a.words))

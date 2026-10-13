@@ -2,3 +2,7 @@ numpy
 Pillow
 # captions/ also needs ffmpeg on PATH; whisperx or torchaudio may replace pocketsphinx later
 pocketsphinx
+# publish/ posts to the platforms' APIs
+requests
+# captions/transcribe.py: Whisper word timings (faster-whisper; or mlx-whisper on Apple silicon, then use --backend mlx)
+faster-whisper

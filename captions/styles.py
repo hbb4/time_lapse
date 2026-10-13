@@ -45,6 +45,8 @@ BASE = dict(size=104, big=150, max_chars=13, max_lines=2, y=0.66, case=None,
             color=(255, 255, 255), active=(255, 176, 92), stress=(255, 214, 140),
             enter="pop", pop=0.16, hold=0.7, fade=0.22, shadow=0.75, glow=True,
             stress_size=1.6,   # stressed word size relative to the normal size (it is alone on screen)
+            stroke=0,          # outline width in px at 1080 wide (black); 0 = none
+            lift=0,            # the spoken word grows by this fraction (0.12 = 12 %) while it is active
             fx=["stairs", "stack"],   # layout effects the style cycles through on key lines
             fx_every=10)              # about one effect every this many seconds (long form: x1.6)
 
@@ -64,11 +66,22 @@ STYLES = {
     "poster":  dict(font="condensed", stress_font="italic_serif", fx=["stack", "stairs"], size=118, big=160, max_chars=12, case="upper",
                     enter="slide", pop=0.2, color=(255, 255, 255), active=(255, 236, 160), stress=(255, 140, 120),
                     stress_case="lower", stress_size=1.9),
+    # creator look: heavy capitals with a thick outline; the spoken word turns yellow and swells; stress in green
+    "hype":    dict(font="heavy", stress_font="heavy", fx=["stack", "stairs"], size=96, big=140, max_chars=12, max_words=3,
+                    case="upper", enter="pop", pop=0.14, color=(255, 255, 255), active=(255, 226, 40), stress=(80, 255, 120),
+                    stroke=7, lift=0.05, glow=False, shadow=0.9, stress_size=1.5, y=0.62),
+    # clean sans: light lowercase with a gentle highlight, no outline; for calm talking-head or voiceover clips
+    "clean":   dict(font="bold", stress_font="bold", fx=["cascade", "spread"], size=88, big=118, max_chars=15, max_words=4,
+                    case="lower", enter="rise", pop=0.22, color=(255, 255, 255), active=(120, 220, 255), stress=(255, 255, 255),
+                    stroke=0, lift=0.04, glow=False, shadow=0.85),
 }
+
+# "random" draws from these only, so adding looks never changes the look of a clip that is re-rendered
+RANDOM_POOL = ("pop", "poster", "serif", "type", "whisper")
 
 def get(name=None, seed=""):
     if not name or name == "random":
-        name = random.Random(zlib.crc32(seed.encode())).choice(sorted(STYLES))
+        name = random.Random(zlib.crc32(seed.encode())).choice(sorted(RANDOM_POOL))
     s = dict(BASE, **STYLES[name])
     s["name"] = name
     s["font_path"], s["stress_path"] = font(s["font"]), font(s["stress_font"])

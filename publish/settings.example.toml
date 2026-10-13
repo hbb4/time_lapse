@@ -1,0 +1,26 @@
+# Copy to ~/.config/time_lapse/publish/settings.toml. Everything here is optional; these are the defaults you are most likely to change.
+
+platforms = ["youtube", "tiktok", "instagram", "facebook", "x"]
+privacy = "public"                    # public | unlisted | private (anything but public only goes to YouTube and TikTok)
+hashtags = ["timelapse", "sanfrancisco"]
+cta = ""                              # a line added under every description
+stagger_seconds = 0                   # pause between platforms
+tiktok_mode = "direct"                # direct | draft (draft lands in your TikTok inbox; works before TikTok audits your app)
+
+[captions]
+mode = "auto"                         # auto: burn captions in | done: the video already has them | off
+style = "auto"                        # auto picks from pace, tone and footage; or pop serif type whisper poster hype clean
+edit = "subtle"                       # none | subtle | punchy (jump-cut zoom, push, punch on stressed words)
+cut_silence = false
+backend = "faster"                    # faster | mlx (Apple silicon)
+# model = "large-v3"
+# language = "en"
+# music = "~/Music/bed.mp3"           # ducked under the voice
+
+# Limits are conservative defaults from each platform's docs, which change. Raise them if your account allows more.
+[limits.instagram]
+max_seconds = 90
+[limits.facebook]
+max_seconds = 90
+[limits.x]
+max_seconds = 140                     # 140 s on free accounts; Premium accounts can post much longer

@@ -57,3 +57,7 @@ _captions/
 captions/recordings/
 captions/music/
 captions/work/
+
+# Posting credentials and local publisher state
+.env
+tokens.json
