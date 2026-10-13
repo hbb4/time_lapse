@@ -5,8 +5,7 @@ import math
 from datetime import datetime, timedelta
 
 # San Francisco Coordinates
-LATITUDE = 37.791667734079596
-LONGITUDE = -122.41549323195979
+from location import LATITUDE, LONGITUDE  # location.py is gitignored; copy location.example.py
 
 def get_local_offset(dt):
     """Returns UTC offset for SF (PST=-8, PDT=-7)."""

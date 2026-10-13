@@ -6,8 +6,7 @@ from datetime import datetime, timedelta
 import math
 
 # Coordinates provided by user
-LATITUDE = 37.791667734079596
-LONGITUDE = -122.41549323195979
+from location import LATITUDE, LONGITUDE  # location.py is gitignored; copy location.example.py
 
 def get_sun_time(date, event="sunrise"):
     """

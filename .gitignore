@@ -30,3 +30,30 @@ __pycache__/
 
 # Vim undo files
 *.un~
+
+# The camera's coordinates (copy location.example.py to location.py)
+location.py
+
+# Never commit videos, frames or audio
+*.mp4
+*.mov
+*.m4v
+*.mkv
+*.avi
+*.webm
+TLS_*.jpg
+*.jxl
+*.tar
+*.m4a
+*.mp3
+*.wav
+frames/
+renders/
+samples/
+proxies/
+previews/
+_pipeline/
+_captions/
+captions/recordings/
+captions/music/
+captions/work/

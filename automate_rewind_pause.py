@@ -7,8 +7,7 @@ import pytz
 from PIL import Image, ImageDraw, ImageFont
 
 # San Francisco Coordinates
-LATITUDE = 37.791667734079596
-LONGITUDE = -122.41549323195979
+from location import LATITUDE, LONGITUDE  # location.py is gitignored; copy location.example.py
 SF_TZ = pytz.timezone("America/Los_Angeles")
 
 def get_sun_time(date, zenith_deg=90.833):

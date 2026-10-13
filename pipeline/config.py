@@ -1,6 +1,7 @@
 """Shared settings for the time lapse pipeline."""
 
 import os
+import runpy
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -40,5 +41,8 @@ SKY_FRACTION = 0.40      # top 40% of the upright frame is sky
 GROUND_FRACTION = 0.45   # bottom 45% (buildings) is used for stabilization
 
 TZ = ZoneInfo("America/Los_Angeles")
-LATITUDE = 37.791667734079596
-LONGITUDE = -122.41549323195979
+# The camera's coordinates live in location.py at the repo root, which is gitignored.
+# Without it the rounded values in location.example.py are used (sun times shift by seconds).
+_here = Path(__file__).resolve().parent.parent
+_loc = runpy.run_path(str(next(p for p in (_here / "location.py", _here / "location.example.py") if p.exists())))
+LATITUDE, LONGITUDE = _loc["LATITUDE"], _loc["LONGITUDE"]
