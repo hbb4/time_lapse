@@ -57,3 +57,7 @@ _captions/
 captions/recordings/
 captions/music/
 captions/work/
+
+# Pick of the day: real position screenshots and rendered clips stay out of git
+picks/screenshots/
+picks/out/

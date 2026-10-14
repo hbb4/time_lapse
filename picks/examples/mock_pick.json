@@ -1,0 +1,17 @@
+{
+  "date": "Thu Oct 15, 2026",
+  "exchange": "Kalshi",
+  "market": "Highest temperature in NYC today",
+  "outcome": "71° to 72°",
+  "side": "YES",
+  "price_cents": 34,
+  "model_prob": 0.52,
+  "drivers": [
+    "Forecast blend lands at 71.7°F",
+    "Short-range models agree within 0.5°",
+    "Clear skies, light westerly wind"
+  ],
+  "ticker": "KXHIGHNY-26OCT15-B71.5",
+  "handle": "@yourhandle",
+  "disclaimer": "Not financial advice."
+}
