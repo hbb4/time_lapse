@@ -3,10 +3,11 @@
 A short vertical (9:16, 1080x1920) clip for a social post: the time lapse plays behind, and the day's
 pick sits in front. No voice; an instrumental is optional.
 
-On screen (15 s by default): PICK OF THE DAY, the date and market title, then the position screenshot
-rises in large, then shrinks up while the side and price, model vs market vs edge, and up to three
-forecast drivers come in on a frosted panel; it ends on the handle and the disclaimer. Text stays inside
-the area TikTok, Reels and Shorts leave clear of their buttons.
+On screen (15 s by default), all in the lower part of the frame so the sky stays clear: PICK OF THE DAY
+with the picks' win record on a gold badge, the date and market title, then the position screenshot pops
+in. At 3.2 s it gives way to a shorter frosted panel with the side and price, model vs market vs edge,
+and up to two forecast drivers (`--max-drivers`). It ends on the record shown large, the handle and the
+disclaimer. Text stays inside the area TikTok, Reels and Shorts leave clear of their buttons.
 
 ## Run it
 

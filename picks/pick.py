@@ -12,6 +12,7 @@ when missing. Example (examples/mock_pick.json):
       "side": "YES",                              # YES or NO
       "price_cents": 34,                          # entry price
       "model_prob": 0.52,                         # the model's probability for the side taken
+      "record": {"wins": 41, "losses": 23},       # the picks' running record (or a string, "41-23")
       "drivers": ["Forecast blend 71.7°F", ...],  # up to 3 short lines from the blend details
       "ticker": "KXHIGHNY-26OCT15-B71.5",
       "handle": "@yourhandle",
@@ -34,6 +35,7 @@ class Pick:
     event: str = ""
     model_prob: Optional[float] = None
     drivers: list = field(default_factory=list)
+    record: object = None
     ticker: str = ""
     handle: str = ""
     disclaimer: str = "Not financial advice."
@@ -54,6 +56,15 @@ class Pick:
         if self.model_prob is None: return None
         return round(self.model_prob * 100 - self.price_cents)
 
+    def record_text(self):
+        """'41–23 · 64%' (pushes shown as a third number when there are any); '' without a record."""
+        r = self.record
+        if not r: return ""
+        if isinstance(r, str): return r.replace("-", "–")
+        w, l, pu = r.get("wins", 0), r.get("losses", 0), r.get("pushes", 0)
+        s = f"{w}–{l}" + (f"–{pu}" if pu else "")
+        return s + (f" · {100 * w / (w + l):.0f}%" if w + l else "")
+
     def headline(self):
         """'YES 71° to 72° @ 34¢'"""
         return " ".join(x for x in (self.side, self.outcome) if x) + f" @ {self.price_cents:g}¢"
@@ -63,6 +74,7 @@ class Pick:
         lines = [f"Pick of the day{' · ' + self.date if self.date else ''}",
                  f"{self.market}{' (' + self.event + ')' if self.event else ''}",
                  self.headline()]
+        if self.record_text(): lines.append(f"Picks record: {self.record_text()}")
         if self.model_prob is not None:
             lines.append(f"Model {self.model_prob * 100:.0f}% vs market {self.price_cents:g}% (edge {self.edge_pts:+d} pts)")
         lines += [f"· {d}" for d in self.drivers[:3]]

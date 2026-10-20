@@ -6,6 +6,7 @@
   "side": "YES",
   "price_cents": 34,
   "model_prob": 0.52,
+  "record": {"wins": 41, "losses": 23},
   "drivers": [
     "Forecast blend lands at 71.7°F",
     "Short-range models agree within 0.5°",
