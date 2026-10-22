@@ -12,7 +12,7 @@ From Python (serving_quant):
 What is on screen, in order (default 15 s), all in the lower part of the frame so the sky stays clear:
   0.1 s  PICK OF THE DAY with the picks' record on a gold badge, the date, the market title
   0.4 s  the position screenshot pops in
-  3.2 s  it gives way to the pick: side and price, model vs market vs edge, and up to 2 forecast drivers
+  5.4 s  it gives way to the pick: side and price, model vs market vs edge, and up to 2 forecast drivers
   -2.6 s  everything clears to the record (large), the handle and the disclaimer
 No voice. Music, when given, is trimmed to the clip with a short fade in and a longer fade out.
 Next to OUT it also writes OUT_cover.jpg (the stats moment, for the post thumbnail) and OUT.txt
@@ -172,6 +172,9 @@ def scrim():
 
 # ---------- layout ----------
 SHOT_W = 520          # screenshot width on screen: small enough to leave the sky clear
+BOTTOM = 1695         # where the box ends (px from the top). Blake's pick: low in the frame, which runs into
+                      # the apps' caption area (the bottom 480 px); 1470 keeps it clear of that
+T_STATS = 5.4         # when the screenshot gives way to the pick (it is up from 0.4 s, so about 5 s)
 INK = (34, 24, 8)     # dark text on the gold record badge
 
 
@@ -180,8 +183,8 @@ def build(p, shot, seconds, max_drivers=2):
     header and record, title, then the screenshot. At t_stats the screenshot gives way to the shorter pick
     panel and the header and title glide down to sit on top of it."""
     L, T, R, B = SAFE
-    tw, bot = R - L, B + 30
-    t_stats, t_end = 3.2, seconds - 2.6
+    tw, bot = R - L, BOTTOM
+    t_stats, t_end = T_STATS, seconds - 2.6
 
     # the pick panel, measured first so the header can glide onto it
     col = SIDE_COLOR.get(p.side, ACCENT)
@@ -235,7 +238,7 @@ def build(p, shot, seconds, max_drivers=2):
     panel = (L - 24, panel_top, R + 24, bot)
 
     # end: the record big, then handle and disclaimer, centred
-    end, ey = [], H * 0.36
+    end, ey = [], H * 0.48
     if p.record_text():
         end.append(El(text_el("PICKS RECORD", "heavy", 32, ACCENT, tracking=5), CX, ey, t_end + 0.25, center=True))
         big = text_el(p.record_text().split(" · ")[0], "heavy", 150, ACCENT)

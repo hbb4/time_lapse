@@ -5,7 +5,7 @@ pick sits in front. No voice; an instrumental is optional.
 
 On screen (15 s by default), all in the lower part of the frame so the sky stays clear: PICK OF THE DAY
 with the picks' win record on a gold badge, the date and market title, then the position screenshot pops
-in. At 3.2 s it gives way to a shorter frosted panel with the side and price, model vs market vs edge,
+in. At 5.4 s it gives way to a shorter frosted panel with the side and price, model vs market vs edge,
 and up to two forecast drivers (`--max-drivers`). It ends on the record shown large, the handle and the
 disclaimer. Text stays inside the area TikTok, Reels and Shorts leave clear of their buttons.
 
