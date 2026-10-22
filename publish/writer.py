@@ -65,6 +65,7 @@ def build(platform, kind, settings, text="", title=None, description=None, short
         r["text"] = _with_tail(cap, tail, lim[key]); r["title"] = trim(o.get("title") or hook, 255)
     elif platform == "x":
         cap = o.get("text") or short or hook
+        link = link if settings.get("x_include_link") else ""      # X bills a post with a URL far above a plain one
         x_tail = " ".join(x for x in ([link] if link else []) + ["#" + t for t in tg])
         r["text"] = _with_tail(cap, x_tail, lim["text"], sep=" ", url_len=23 if link else 0, link=link)
     return r

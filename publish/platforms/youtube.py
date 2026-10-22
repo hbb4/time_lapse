@@ -26,7 +26,7 @@ class YouTube(Platform):
 
     def publish(self, job):
         t = job.texts["youtube"]; kind = job.kind["youtube"]
-        auth = {"Authorization": "Bearer " + self.tokens.fresh(self.login, self.refresh)}
+        auth = {"Authorization": "Bearer " + self.tokens.fresh(self.key, self.refresh)}
         size = job.video.stat().st_size
         meta = {"snippet": {"title": t["title"], "description": t["description"], "tags": t["tags"],
                             "categoryId": self.settings["youtube_category"]},

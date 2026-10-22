@@ -28,7 +28,11 @@ DEFAULTS = {
     "stagger_seconds": 0,                 # wait between platforms so posts don't all land in the same second
     "retries": 3,                         # whole-post attempts per platform before it is marked failed
     "meta_api_version": "v23.0",
-    "tiktok_mode": "direct",              # direct = publish now; draft = lands in your TikTok inbox to finish by hand
+    # TikTok: draft = the video lands in your TikTok inbox and you tap Post. direct = published by the API, but TikTok only allows
+    # that publicly after auditing your app, and its rules want a person confirming each post, so unattended runs stay drafts.
+    "tiktok_mode": "draft",
+    "tiktok_direct_unattended": False,    # True lets review = "auto"/"delay" use direct posting too (against TikTok's guidelines)
+    "x_include_link": False,              # X bills posts that contain a URL at a much higher rate than plain posts
     "youtube_category": "22",             # 22 = People & Blogs, 24 = Entertainment, 28 = Science & Technology
     "youtube_made_for_kids": False,
     "limits": {
@@ -38,6 +42,12 @@ DEFAULTS = {
         "facebook":  {"max_seconds": 90, "reel_description": 2200, "description": 5000, "max_bytes": 10 * 2**30},
         "x":         {"max_seconds": 140, "text": 280, "max_bytes": 512 * 2**20},
     },
+    # Review: manual = nothing posts until you approve it; delay = posts after delay_minutes unless you reject it; auto = posts at once.
+    "review": {"mode": "manual", "delay_minutes": 30},
+    # Notifications: channels to use, and each channel's own settings (secrets come from the environment, see .env.example)
+    "notify": {"channels": [], "telegram": {"chat_id": ""}, "ntfy": {"topic": "", "server": "https://ntfy.sh"}, "discord": {}, "macos": {}},
+    "watch": "",                          # folder `publish watch` picks videos up from for this account (~ allowed)
+    "accounts": {},                       # [accounts.NAME] tables: each can override anything here (see settings.example.toml)
     "captions": {"mode": "auto", "style": "auto", "edit": "subtle", "cut_silence": False, "backend": "faster",
                  "model": None, "language": None, "music": None},
 }
@@ -58,12 +68,25 @@ def load_env():
             k, v = line.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip().strip("'\""))
 
-def settings():
+def settings(account=None):
+    """Defaults, then settings.toml, then the [accounts.<account>] table on top when an account is named."""
     load_env()
     s = copy.deepcopy(DEFAULTS)
     p = HOME / "settings.toml"
     if p.exists(): _merge(s, tomllib.loads(p.read_text()))
+    if account and account != "default":
+        if account not in s["accounts"]:
+            raise SystemExit(f"unknown account '{account}': add an [accounts.{account}] table to {p} (known: {', '.join(s['accounts']) or 'none'})")
+        _merge(s, copy.deepcopy(s["accounts"][account]))
+    s["account"] = account or "default"
     return s
+
+def account_names():
+    return ["default"] + [a for a in settings()["accounts"] if a != "default"]
+
+def token_key(platform, account="default"):
+    """Where a login is stored: 'x' for the default account, 'x:sf_clouds' for a named one."""
+    return platform if not account or account == "default" else f"{platform}:{account}"
 
 def env(name, default=None):
     load_env()

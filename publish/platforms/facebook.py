@@ -14,12 +14,12 @@ class Facebook(Platform):
     login = ""
 
     def missing(self):
-        c = meta.creds(self.tokens)
-        return [f"{k} (python -m publish auth meta)" for k in ("access_token", "page_id") if not c.get(k)]
+        c = meta.creds(self.tokens, self.account)
+        return [f"{k} ({meta.auth_hint(self.account)})" for k in ("access_token", "page_id") if not c.get(k)]
 
     def publish(self, job):
-        c = meta.creds(self.tokens)
-        if not c.get("access_token") or not c.get("page_id"): raise MissingAuth("facebook: run python -m publish auth meta")
+        c = meta.creds(self.tokens, self.account)
+        if not c.get("access_token") or not c.get("page_id"): raise MissingAuth(f"facebook: run {meta.auth_hint(self.account)}")
         return (self._reel if job.kind["facebook"] == "reel" else self._video)(job, c)
 
     def _reel(self, job, c):

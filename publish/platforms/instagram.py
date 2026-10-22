@@ -13,12 +13,12 @@ class Instagram(Platform):
     login = ""                                   # credentials live under "meta"
 
     def missing(self):
-        c = meta.creds(self.tokens)
-        return [f"{k} (python -m publish auth meta)" for k in ("access_token", "ig_user_id") if not c.get(k)]
+        c = meta.creds(self.tokens, self.account)
+        return [f"{k} ({meta.auth_hint(self.account)})" for k in ("access_token", "ig_user_id") if not c.get(k)]
 
     def publish(self, job):
-        c = meta.creds(self.tokens)
-        if not c.get("access_token") or not c.get("ig_user_id"): raise MissingAuth("instagram: run python -m publish auth meta")
+        c = meta.creds(self.tokens, self.account)
+        if not c.get("access_token") or not c.get("ig_user_id"): raise MissingAuth(f"instagram: run {meta.auth_hint(self.account)}")
         api, tok, uid = meta.base(self.settings), c["access_token"], c["ig_user_id"]
         caption = job.texts["instagram"]["text"]
         box = self.http.post(f"{api}/{uid}/media", data=dict(media_type="REELS", upload_type="resumable", caption=caption,

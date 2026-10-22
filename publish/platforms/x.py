@@ -22,7 +22,7 @@ class X(Platform):
                     expires_at=self.now() + j.get("expires_in", 7200))
 
     def publish(self, job):
-        h = {"Authorization": "Bearer " + self.tokens.fresh(self.login, self.refresh)}
+        h = {"Authorization": "Bearer " + self.tokens.fresh(self.key, self.refresh)}
         size = job.video.stat().st_size
         mid = self.http.post(f"{API}/2/media/upload/initialize", headers=h, json=dict(media_type="video/mp4", total_bytes=size,
                              media_category="tweet_video")).json()["data"]["id"]

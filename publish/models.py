@@ -24,6 +24,7 @@ class Job:
     texts: dict                      # platform -> {title, description, text, tags}
     kind: dict                       # platform -> short | long | reel | video | post
     privacy: str = "public"
+    attended: bool = True            # a person approved this post (review = manual); unattended posts only ever become TikTok drafts
     cover: Path | None = None
     captions: Path | None = None     # .srt
     settings: dict = field(default_factory=dict)

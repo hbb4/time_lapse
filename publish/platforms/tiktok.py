@@ -29,9 +29,10 @@ class TikTok(Platform):
 
     def publish(self, job):
         t = job.texts["tiktok"]
-        h = {"Authorization": "Bearer " + self.tokens.fresh(self.login, self.refresh), "Content-Type": "application/json; charset=UTF-8"}
+        h = {"Authorization": "Bearer " + self.tokens.fresh(self.key, self.refresh), "Content-Type": "application/json; charset=UTF-8"}
         size = job.video.stat().st_size
-        draft = self.settings["tiktok_mode"] == "draft"
+        # TikTok wants a person to confirm each direct post, so a post nobody approved (review = auto/delay) is only ever a draft
+        draft = self.settings["tiktok_mode"] == "draft" or (not job.attended and not self.settings["tiktok_direct_unattended"])
         chunk, count = chunk_plan(size)
         source = {"source": "FILE_UPLOAD", "video_size": size, "chunk_size": chunk, "total_chunk_count": count}
         note = None
@@ -68,7 +69,7 @@ class TikTok(Platform):
             return None
         d = self.wait_for(check, "TikTok to finish processing", timeout=900, every=6)
         ids = d.get("publicaly_available_post_id") or d.get("publicly_available_post_id") or []
-        if draft: note = "saved to your TikTok inbox: open the app to add sound/effects and post"
+        if draft: note = "saved to your TikTok inbox (open the app, add sound if you like, and post). Caption to paste: " + t["text"]
         return Result(str(ids[0]) if ids else pid, None, note)
 
 def login(say=print):

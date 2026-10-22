@@ -4,12 +4,17 @@ from .. import config
 GRAPH = "https://graph.facebook.com"
 LOGIN = "meta"
 
-def creds(tokens):
-    """{access_token, page_id, ig_user_id}: environment variables win over what `auth meta` saved."""
-    t = tokens.get(LOGIN)
+def creds(tokens, account="default"):
+    """{access_token, page_id, ig_user_id} for an account. For the default account, environment variables win over what
+    `auth meta` saved; named accounts only use what `auth meta --account NAME` saved."""
+    t = tokens.get(config.token_key(LOGIN, account))
+    if account != "default": return dict(access_token=t.get("access_token"), page_id=t.get("page_id"), ig_user_id=t.get("ig_user_id"))
     return dict(access_token=config.env("META_PAGE_TOKEN") or t.get("access_token"),
                 page_id=config.env("FB_PAGE_ID") or t.get("page_id"),
                 ig_user_id=config.env("IG_USER_ID") or t.get("ig_user_id"))
+
+def auth_hint(account):
+    return "python -m publish auth meta" + ("" if account == "default" else f" --account {account}")
 
 def base(settings):
     return f"{GRAPH}/{settings['meta_api_version']}"

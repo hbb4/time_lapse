@@ -45,9 +45,9 @@ class Base(unittest.TestCase):
         for n in ("youtube", "tiktok", "x"): self.tokens.put(n, dict(access_token=n.upper(), expires_at=time.time() + 9999))
         self.tokens.put("meta", dict(access_token="PAGE", page_id="PG", ig_user_id="IG"))
         self.s = config.settings(); self.s["meta_api_version"] = "v23.0"
-    def job(self, kinds, privacy="public", d=30.0):
+    def job(self, kinds, privacy="public", d=30.0, attended=True):
         texts = {p: writer.build(p, k, self.s, "Hello world. This is a test post about long exposure.", link="") for p, k in kinds.items()}
-        return Job(self.video, media(d=d, size=self.video.stat().st_size), texts, kinds, privacy, self.cover, self.srt, self.s)
+        return Job(self.video, media(d=d, size=self.video.stat().st_size), texts, kinds, privacy, attended, self.cover, self.srt, self.s)
     def ad(self, name, fake): return REGISTRY[name](fake, self.tokens, self.s, log=lambda m: None, sleep=lambda s: None)
 
 class Writer(unittest.TestCase):
@@ -60,6 +60,12 @@ class Writer(unittest.TestCase):
             if p == "x": self.assertLessEqual(len(t["text"].replace("https://example.com/some/long/link", "x" * 23)), 280)
             if p in ("tiktok", "instagram"): self.assertLessEqual(len(t["text"]), 2200)
         self.assertTrue(writer.build("youtube", "short", S, "Hi there friend.")["title"].endswith("#Shorts"))
+
+    def test_x_posts_leave_the_link_out_unless_asked(self):
+        t = writer.build("x", "post", S, "Hello there friend.", link="https://example.com/a")
+        self.assertNotIn("https://", t["text"])
+        t = writer.build("x", "post", dict(S, x_include_link=True), "Hello there friend.", link="https://example.com/a")
+        self.assertIn("https://example.com/a", t["text"])
 
     def test_hashtag_caps_and_overrides(self):
         t = writer.build("x", "post", S, "A long exposure photography story about battery battery battery.", tags=["a", "b", "c", "d"])
@@ -129,6 +135,7 @@ class Adapters(Base):
         self.assertTrue(any("thumbnails/set?videoId=V2" in u for _, u in f.urls())); self.assertTrue(any("captions" in u for _, u in f.urls()))
 
     def test_tiktok_direct_forced_private(self):
+        self.s["tiktok_mode"] = "direct"
         polls = [0]
         def status(kw):
             polls[0] += 1
@@ -142,7 +149,17 @@ class Adapters(Base):
         r = self.ad("tiktok", f).publish(self.job({"tiktok": "reel"}))
         self.assertEqual(r.remote_id, "123"); self.assertIn("only me", r.note)
 
+    def test_tiktok_unattended_posts_only_become_drafts(self):
+        status = Resp(200, {"data": {"status": "SEND_TO_USER_INBOX"}})
+        f = Fake([("POST", "inbox/video/init", Resp(200, {"data": {"publish_id": "P2", "upload_url": "https://tt/up"}})),
+                  ("PUT", "https://tt/up", Resp(201)), ("POST", "status/fetch", status)])
+        self.s["tiktok_mode"] = "direct"                                     # direct is configured, but nobody approved this post
+        r = self.ad("tiktok", f).publish(self.job({"tiktok": "reel"}, attended=False))
+        self.assertTrue(any("inbox/video/init" in u for _, u in f.urls())); self.assertFalse(any("creator_info" in u for _, u in f.urls()))
+        self.assertIn("inbox", r.note); self.assertIn("Caption to paste", r.note)
+
     def test_tiktok_chunk_plan_and_duration_cap(self):
+        self.s["tiktok_mode"] = "direct"
         self.assertEqual(tiktok_mod.chunk_plan(10 * 2**20), (10 * 2**20, 1))
         cs, n = tiktok_mod.chunk_plan(150 * 2**20)
         self.assertEqual((cs, n), (32 * 2**20, 4)); self.assertLess(150 * 2**20 - (n - 1) * cs, 128 * 2**20)

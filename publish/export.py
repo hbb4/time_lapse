@@ -69,3 +69,12 @@ def universal(path, media, out_dir=None):
                "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", str(out)]
     subprocess.run(cmd, check=True)
     return out, probe(out)
+
+def preview(src, out, max_bytes=45 * 2**20):
+    """A copy small enough to send to a phone (Telegram bots take up to 50 MB): the file itself when it already is, else a 960 px, CRF 30 re-encode."""
+    src = Path(src)
+    if src.stat().st_size <= max_bytes: return src
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(src), "-vf", "scale=w=960:h=960:force_original_aspect_ratio=decrease:force_divisible_by=2",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "30", "-maxrate", "1500k", "-bufsize", "3M", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-b:a", "64k", "-movflags", "+faststart", str(out)], check=True)
+    return Path(out)

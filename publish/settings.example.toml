@@ -5,8 +5,24 @@ privacy = "public"                    # public | unlisted | private (anything bu
 hashtags = ["timelapse", "sanfrancisco"]
 cta = ""                              # a line added under every description
 stagger_seconds = 0                   # pause between platforms
-tiktok_mode = "direct"                # direct | draft (draft lands in your TikTok inbox; works before TikTok audits your app)
+tiktok_mode = "draft"                 # draft: the video lands in your TikTok inbox and you tap Post (works before TikTok audits your app)
+                                      # direct: published by the API (private-only until TikTok audits the app)
+x_include_link = false                # X bills a post that contains a URL at a much higher rate than a plain post
 
+# --- review: what happens between "rendered" and "posted" ---
+[review]
+mode = "manual"                       # manual: nothing posts until you approve (python -m publish approve N, or a Telegram tap)
+                                      # delay:  posts after delay_minutes unless you reject it
+                                      # auto:   posts at once (you still get a notification)
+delay_minutes = 30
+
+# --- notifications ---
+[notify]
+channels = ["telegram", "macos"]      # telegram (two-way: Approve/Reject buttons) | ntfy | discord | macos
+[notify.telegram]
+chat_id = ""                          # your chat id; the bot token is TELEGRAM_BOT_TOKEN in .env
+[notify.ntfy]
+topic = ""                            # a hard-to-guess topic name; install the ntfy app and subscribe to it
 [captions]
 mode = "auto"                         # auto: burn captions in | done: the video already has them | off
 style = "auto"                        # auto picks from pace, tone and footage; or pop serif type whisper poster hype clean
@@ -24,3 +40,22 @@ max_seconds = 90
 max_seconds = 90
 [limits.x]
 max_seconds = 140                     # 140 s on free accounts; Premium accounts can post much longer
+
+# --- accounts: each is a full set of overrides on top of everything above ---
+# Log each one in once: python -m publish auth x --account sf_clouds   (be signed in to that account in your browser first)
+[accounts.sf_clouds]
+platforms = ["youtube", "tiktok", "x"]
+hashtags = ["clouds", "fog", "sanfrancisco"]
+watch = "~/ToPost/sf_clouds"          # `python -m publish watch` picks videos up from here
+captions = { style = "serif", edit = "subtle" }
+[accounts.sf_clouds.notify]
+channels = ["telegram"]
+[accounts.sf_clouds.notify.telegram]
+chat_id = "123456789"
+
+[accounts.sf_night]
+platforms = ["x", "tiktok"]
+hashtags = ["night", "citylights"]
+watch = "~/ToPost/sf_night"
+captions = { style = "hype", edit = "punchy" }
+review = { mode = "delay", delay_minutes = 45 }   # this one posts itself 45 minutes after you are told, unless you reject it
