@@ -129,7 +129,7 @@ def main():
     os.makedirs(a.passages, exist_ok=True)
     cols = ["name", "passage", "recording", "folder", "from", "to", "move", "style", "aspect", "fit", "ending",
             "music", "music_start", "music_db", "end_boost_db", "trails", "exposure", "beat_punch", "beat_rewind",
-            "fx_every", "end_card", "end_card_seconds", "end_card_sound", "cover", "safe", "contrast", "index", "author", "title", "words", "est_seconds", "mood", "why", "recipe", "day", "day_score", "span"]
+            "fx_every", "end_card", "end_card_seconds", "end_card_sound", "cover", "safe", "contrast", "blend", "index", "author", "title", "words", "est_seconds", "mood", "why", "recipe", "day", "day_score", "span"]
     out = []
     for r in csv.DictReader(open(a.captions, encoding="utf-8")):
         i = int(r["index"])

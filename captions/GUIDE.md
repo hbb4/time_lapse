@@ -136,7 +136,8 @@ asking anyone, the evening lets it go.
 | `from`, `to` | `2026-09-21 17:45`, or `17:45` with a folder, or `#380` frame numbers with a folder | | the footage; date-times can span days and folders. Times are the pipeline's clock-corrected ones. |
 | `folder` | `TLST05B01403_260921165611` (`+` joins several) | | only needed with clock times or frame numbers |
 | `aspect` | `9x16`, `16x9`, `both` | `9x16` | 16x9 is the long-form look: smaller, wider caption lines, lower in the frame, framed high and on the right (sky and sunsets, not the big building) |
-| `fit` | `span`, `realtime` | `span` | span: the whole footage span plays across the reading; realtime: every frame once at 30 fps (long readings cover more real time) |
+| `fit` | `span`, `realtime` | `span` | span: the whole footage span plays across the reading; realtime: every frame once at 30 fps (long readings cover more real time). Either way each video frame is one whole camera frame, never a blend: a span with more frames than the reading needs skips whole frames, and one with too few is widened evenly on both sides by batch.py so no frame repeats. |
+| `blend` | `yes` / `no` | `no` | yes brings back blended frames (smoother at high speed, softer clouds) |
 | `move` | `push`, `pull`, `tilt`, `still`, `drift` | `push` | slow camera move over the whole clip (drift: slow glide to the right, made for 16:9) |
 | `style` | `pop`, `serif`, `type`, `whisper`, `poster` | random per clip | caption look (section 5) |
 | `fx_every` | seconds | 10 (16 in 16:9) | about how often a layout effect appears; 0 = only marked lines |
@@ -146,7 +147,7 @@ asking anyone, the evening lets it go.
 | `music_db` | dB | `-16` | steady music level under the voice |
 | `end_boost_db` | dB | `6` | how much louder the music gets after the reading |
 | `trails` | 0 to 1 | `0` | light trails (best on clear nights) |
-| `exposure` | number | `1` | long-exposure blur (blends more frames per video frame) |
+| `exposure` | number | `1` | long-exposure blur (blends frames on purpose; 1 = off) |
 | `beat_punch` | e.g. `0.03` | `0` | zoom bump on downbeats (off by default) |
 | `beat_rewind` | `yes` / `no` | `no` | nudge the rewind onto the nearest downbeat (by a fraction of a second at most) |
 | `end_card` | path to an image, GIF or video | none (off) | shown after the ending, e.g. an author/title card. Make it in the clip's shape (1080x1920 for 9:16, 1920x1080 for 16:9); anything else is scaled to fill and cropped. It dissolves in from the last frame. Write `{aspect}` in the name (`cards/fog_{aspect}.png`) to use `fog_9x16.png` and `fog_16x9.png` with `aspect both`. |
@@ -239,6 +240,7 @@ match.py picks from all ranked days.
 | Ending | render.py flags `--pause` (0.1 s), `--rewind-seconds` (2), `--hold-seconds` |
 | Mood words and clip types | `match.py` `MOODS`, `RECIPE_FOR`, `ANCHOR` |
 | Reading pace / long-form threshold | `match.py --wpm`, `--long-seconds` |
+| How hard renders push the Mac | `batch.py` / `render.py --threads` (default 2, at low priority with background QoS; 0 = full speed). Rows render one at a time. |
 
 ## 9. Things that could add to this
 

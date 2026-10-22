@@ -26,12 +26,17 @@ line at the top (see GUIDE.md); a line in the passage file wins over the sheet.
   cover         auto (most dramatic frame, default) | a time in the clip like 12.5 | none
   safe          on (default) | off: vertical captions stay clear of the app buttons
   contrast      on (default) | off: stronger shadow over bright backgrounds
+  blend         yes: blend neighbouring frames (default no: every video frame is one whole camera frame)
+
+Every video frame is one whole camera frame. If the span has fewer frames than the reading needs, it is
+widened evenly on both sides (from pipeline.db) so no frame repeats; the printout says when.
+Renders run one at a time, at low priority with 2 threads (--threads 0 = full speed).
 
 Footage comes from the pipeline: times are the clock-corrected ones in pipeline.db, the indoor folders are
 skipped, and packed folders (_packed/*.tar) are read directly. The frames a clip needs are unpacked into
 _captions/work/frames/<name>/ for the render and deleted afterwards (--keep-frames keeps them).
 """
-import argparse, csv, os, shutil, sqlite3, subprocess, sys
+import argparse, csv, json, os, shutil, sqlite3, subprocess, sys
 from datetime import datetime, timedelta
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -76,6 +81,20 @@ def span_rows(db, r):
     args = [t0.isoformat(sep=" "), t1.isoformat(sep=" ")] + sorted(EXCLUDE)
     return db.execute(q + " AND t_local >= ? AND t_local <= ?" + skip + " ORDER BY t_local", args).fetchall()
 
+def widen(db, rows, need):
+    """Grow a span evenly on both sides until it has `need` frames (whole frames, never repeated)."""
+    if len(rows) >= need: return rows
+    q = "SELECT folder, n, t_local FROM frames WHERE error IS NULL" + \
+        (f" AND folder NOT IN ({','.join('?' * len(EXCLUDE))})" if EXCLUDE else "")
+    ex = sorted(EXCLUDE)
+    extra = need - len(rows)
+    before = db.execute(q + " AND t_local < ? ORDER BY t_local DESC LIMIT ?", ex + [rows[0][2], extra // 2]).fetchall()[::-1]
+    after = db.execute(q + " AND t_local > ? ORDER BY t_local LIMIT ?", ex + [rows[-1][2], extra - len(before)]).fetchall()
+    if len(before) + len(after) < extra:          # ran into the start or end of the footage: take more from the other side
+        before = db.execute(q + " AND t_local < ? ORDER BY t_local DESC LIMIT ?",
+                            ex + [rows[0][2], extra - len(after)]).fetchall()[::-1]
+    return before + rows + after
+
 def materialize(rows, cache):
     """Frame paths for the render: loose JPEGs as they are, packed ones unpacked into the cache."""
     paths, by_folder = [], {}
@@ -98,7 +117,7 @@ def materialize(rows, cache):
         if (f, n) in got: paths.append(got[(f, n)])
     return paths
 
-def run_row(db, r, out_dir, dry, keep_frames):
+def run_row(db, r, out_dir, dry, keep_frames, threads=2):
     r = dict(r)
     text = open(r["passage"].strip(), encoding="utf-8").read() if (r.get("passage") or "").strip() else ""
     r.update(markup.directives(text))                          # "@column value" lines in the passage win
@@ -119,13 +138,20 @@ def run_row(db, r, out_dir, dry, keep_frames):
     words = os.path.join(work, f"{name}.words.json")
     if not os.path.exists(words):
         subprocess.run([sys.executable, os.path.join(HERE, "align.py"), rec, r["passage"], words], check=True)
+    if not yes(r.get("blend", "")) and (r.get("fit") or "span").strip() in ("", "span"):
+        reading = json.load(open(words))[-1]["end"] + 0.3     # the ending starts here; the span plays across it
+        need = int(reading * 30) + 1
+        if len(rows) < need:
+            rows = widen(db, rows, need)
+            print(f"  span widened to {len(rows)} frames ({rows[0][2][:16]} to {rows[-1][2][:16]}) so every frame "
+                  "plays once across the reading")
     cache = os.path.join(work, "frames", name)
     frame_txt = os.path.join(work, f"{name}.frames.txt")
     open(frame_txt, "w").write("\n".join(materialize(rows, cache)) + "\n")
     for asp, out in zip(aspects, outs):
         if os.path.exists(out): continue
         cmd = [sys.executable, os.path.join(HERE, "render.py"), frame_txt, out, "--aspect", asp,
-               "--words", words, "--text", r["passage"], "--voice", rec]
+               "--words", words, "--text", r["passage"], "--voice", rec, "--threads", str(threads)]
         for col, flag in [("move", "--move"), ("style", "--style"), ("fit", "--fit"), ("ending", "--ending"),
                           ("music", "--music"), ("music_start", "--music-start"), ("music_db", "--music-db"),
                           ("end_boost_db", "--end-boost-db"), ("trails", "--trails"), ("exposure", "--exposure"),
@@ -134,6 +160,7 @@ def run_row(db, r, out_dir, dry, keep_frames):
                           ("cover", "--cover"), ("safe", "--safe"), ("contrast", "--contrast")]:
             if (r.get(col) or "").strip(): cmd += [flag, r[col].strip()]
         if yes(r.get("beat_rewind", "")): cmd.append("--beat-rewind")
+        if yes(r.get("blend", "")): cmd.append("--blend")
         subprocess.run(cmd, check=True)
     if not keep_frames: shutil.rmtree(cache, ignore_errors=True)
 
@@ -143,9 +170,13 @@ if __name__ == "__main__":
     ap.add_argument("--out", default=OUT, help="where finished clips go (default: CORSAIR/_captions)")
     ap.add_argument("--db", default=str(config.DB_PATH))
     ap.add_argument("--keep-frames", action="store_true", help="keep the unpacked frames after rendering")
+    ap.add_argument("--threads", type=int, default=2, help="threads per render, at low priority (0 = full speed)")
     a = ap.parse_args()
+    if a.threads:
+        try: os.nice(10)                          # renders inherit it; render.py adds background QoS on macOS
+        except OSError: pass
     db = sqlite3.connect(a.db)
     for r in csv.DictReader(open(a.sheet, newline="", encoding="utf-8")):
         if not (r.get("name") or "").strip() or r["name"].startswith("#"): continue
         if a.only and r["name"].strip() not in a.only: continue
-        run_row(db, r, a.out, a.dry_run, a.keep_frames)
+        run_row(db, r, a.out, a.dry_run, a.keep_frames, a.threads)

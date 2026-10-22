@@ -1,14 +1,16 @@
 """Render a clip: time lapse frames + camera move + word-by-word captions synced to a reading + music.
 
 The whole frame span plays across the reading, so any passage length gets the same stretch of the evening
-(--fit realtime plays 1:1 instead). Each output frame is a weighted blend of the source frames it covers,
-so motion stays smooth at any speed. Optional light trails, beat-synced zoom punches, *stressed* words
+(--fit realtime plays 1:1 instead). Each video frame is one whole camera frame, never a blend (Blake): a
+faster span skips whole frames, and a span shorter than the reading repeats frames (batch.py widens short
+spans so that doesn't happen). --blend brings back the blended look; --exposure > 1 blends on purpose.
+Renders run gently by default (lower priority, background QoS on macOS, 2 threads); --threads 0 = full speed. Optional light trails, beat-synced zoom punches, *stressed* words
 (shown alone on screen) and captions placed on surfaces in the scene (roof edge, walls) via passage markup
 (see markup.py). Caption looks live in styles.py (--style).
 
 Demo: frames 380-1650 of TLST05B01403_260921165611 (Sep 21 2026, 17:47-20:36, 8 s interval).
 """
-import argparse, json, os, subprocess, wave
+import argparse, json, os, subprocess, sys, wave
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 import markup, styles
@@ -16,6 +18,7 @@ import markup, styles
 FPS = 30
 W, H = 1080, 1920                      # set by --aspect
 STYLE = None                           # set from --style in main (styles.py); y=0.66 sits below the horizon line
+THREADS = 2                            # worker threads for decoding and the encoder (--threads; 0 = no limit)
 ROTATE = Image.Transpose.ROTATE_270    # camera frames are sideways: 90 deg clockwise, as make_timelapse.sh "cw"
 SAFE = None                            # (left, top, right, bottom) captions stay inside; set in main (--safe)
 CONTRAST = True                        # captions get a stronger shadow over bright backgrounds (--contrast)
@@ -635,7 +638,7 @@ class Frames:
             def mean(p):
                 im = Image.open(p); im.draft("RGB", (336, 190))
                 return np.asarray(im.convert("RGB"), np.float32).mean((0, 1))
-            with ThreadPoolExecutor(8) as ex:
+            with ThreadPoolExecutor(THREADS or 8) as ex:
                 m = np.array(list(ex.map(mean, paths)))
             k = 31                                       # ~4 min of real time at 8 s per frame
             pad = np.pad(m, ((k // 2, k // 2), (0, 0)), mode="edge")
@@ -694,8 +697,19 @@ def apply_directives(a, ap):
             if act.choices and getattr(a, act.dest) not in act.choices:
                 raise SystemExit(f"@{k} {v}: choose from {', '.join(map(str, act.choices))}")
 
+def be_gentle(threads):
+    """Keep the Mac responsive: lower priority, background QoS on macOS (inherited by ffmpeg), capped threads."""
+    global THREADS
+    THREADS = threads
+    if not threads: return
+    try: os.nice(10)
+    except OSError: pass
+    if sys.platform == "darwin":                  # background QoS: efficiency cores, throttled disk I/O
+        subprocess.run(["taskpolicy", "-b", "-p", str(os.getpid())], capture_output=True, check=False)
+
 def main(a):
     global W, H, STYLE, SAFE, CONTRAST
+    be_gentle(a.threads)
     W, H = (1920, 1080) if a.aspect == "16x9" else (1080, 1920)
     m = SAFE_9x16 if a.aspect == "9x16" and a.safe == "on" else dict(left=0, top=0, right=0, bottom=0)
     SAFE = (m["left"], m["top"], W - m["right"], H - m["bottom"])
@@ -728,6 +742,11 @@ def main(a):
     rewind_at = end_at if a.ending == "rewind" else None
     speed = (len(paths) - 1) / max(1, sum(1 for x in tl if x[2]) - 1)
     print(f"{len(paths)} frames over {sum(1 for x in tl if x[2]) / FPS:.1f}s: {speed:.2f} source frames per video frame")
+    if speed < 0.98 and not a.blend:
+        print("  note: fewer frames than the reading needs, so some frames repeat; give it a longer span "
+              "(batch.py widens spans automatically) or use --blend")
+    elif speed > 2.05:
+        print(f"  note: {speed:.1f}x skips frames; a shorter span (from/to) plays smoother")
     silent = a.out.replace(".mp4", ".video.mp4")       # kept so audio can be redone without re-rendering
     cover = a.out.replace(".mp4", "_cover.jpg") if a.cover != "none" else None
     last_fwd = max(p for p, _, f in tl if f)
@@ -738,7 +757,8 @@ def main(a):
         move = MOVES[a.move]
         ff = subprocess.Popen(["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
                                "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-crf", "18",
-                               "-preset", "medium", "-pix_fmt", "yuv420p", silent], stdin=subprocess.PIPE)
+                               "-preset", "medium", "-pix_fmt", "yuv420p"] + (["-threads", str(THREADS)] if THREADS else [])
+                              + [silent], stdin=subprocess.PIPE)
         cap_cache, prev = {}, None
         for i, (pos, captions, forward) in enumerate(tl):
             t = i / FPS
@@ -752,7 +772,10 @@ def main(a):
             # framing follows the clock going forward, then holds still through the rewind
             box = crop_box(src_w, src_h, pos / max(1, last_fwd) if forward else 1.0, move, punch, look)
             step = abs(pos - prev) if prev is not None else speed
-            img = fr.window(pos, max(1.0, step) * (a.exposure if forward else 1))
+            if a.blend or (a.exposure > 1 and forward):
+                img = fr.window(pos, max(1.0, step) * (a.exposure if forward else 1))
+            else:                                       # one whole camera frame, no blending
+                img = fr.get(min(int(round(pos)), len(paths) - 1))
             if a.trails and forward:
                 tr = fr.trails(pos, a.trail_decay)
                 img = img + a.trails * (np.maximum(img, tr) - img)
@@ -808,7 +831,11 @@ def parser():
                     help="span: the whole frame list plays across the reading; realtime: 1 frame per video frame")
     ap.add_argument("--move", choices=sorted(MOVES), default="push")
     ap.add_argument("--exposure", type=float, default=1.0,
-                    help="long-exposure blur: blend this many times the frames each video frame covers")
+                    help="long-exposure blur: blend this many times the frames each video frame covers (1 = off)")
+    ap.add_argument("--blend", action="store_true",
+                    help="blend neighbouring frames for smoothness (off: every video frame is one whole camera frame)")
+    ap.add_argument("--threads", type=int, default=2,
+                    help="threads for decoding and encoding, run at low priority (default 2; 0 = full speed)")
     ap.add_argument("--trails", type=float, default=0.0, help="light trails strength 0-1")
     ap.add_argument("--trail-decay", type=float, default=0.8, help="how much of a trail survives each source frame")
     ap.add_argument("--plane-lean", action="store_true", help="camera leans in toward a surface caption (off: framing stays put)")
