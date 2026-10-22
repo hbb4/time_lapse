@@ -27,6 +27,10 @@ line at the top (see GUIDE.md); a line in the passage file wins over the sheet.
   safe          on (default) | off: vertical captions stay clear of the app buttons
   contrast      on (default) | off: stronger shadow over bright backgrounds
   blend         yes: blend neighbouring frames (default no: every video frame is one whole camera frame)
+  intro         gust | fog | rush | dark | none (default): opening sound + matching screen effect (intro.py)
+  intro_sound, intro_db, intro_seconds, lead (seconds before the reading starts; default per intro)
+  rewind_sfx    a sound file, or whoosh / wind (synthesized) at the rewind
+  voice_db, voice_clean (on | off), loudness (LUFS, default -14; 0 = off)
 
 Every video frame is one whole camera frame. If the span has fewer frames than the reading needs, it is
 widened evenly on both sides (from pipeline.db) so no frame repeats; the printout says when.
@@ -42,7 +46,7 @@ from datetime import datetime, timedelta
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))          # the time_lapse repo root, for the pipeline package
 from pipeline import config, frames as pframes   # noqa: E402
-import markup                                     # noqa: E402
+import intro, markup                                     # noqa: E402
 
 OUT = str(config.FRAMES_ROOT / "_captions")
 EXCLUDE = set(getattr(config, "EXCLUDE_FOLDERS", []))
@@ -140,6 +144,7 @@ def run_row(db, r, out_dir, dry, keep_frames, threads=2):
         subprocess.run([sys.executable, os.path.join(HERE, "align.py"), rec, r["passage"], words], check=True)
     if not yes(r.get("blend", "")) and (r.get("fit") or "span").strip() in ("", "span"):
         reading = json.load(open(words))[-1]["end"] + 0.3     # the ending starts here; the span plays across it
+        reading += intro.lead_for((r.get("intro") or "").strip(), (r.get("lead") or "").strip())   # after the opener
         need = int(reading * 30) + 1
         if len(rows) < need:
             rows = widen(db, rows, need)
@@ -157,7 +162,10 @@ def run_row(db, r, out_dir, dry, keep_frames, threads=2):
                           ("end_boost_db", "--end-boost-db"), ("trails", "--trails"), ("exposure", "--exposure"),
                           ("beat_punch", "--beat-punch"), ("fx_every", "--fx-every"), ("end_card", "--end-card"),
                           ("end_card_seconds", "--end-card-seconds"), ("end_card_sound", "--end-card-sound"),
-                          ("cover", "--cover"), ("safe", "--safe"), ("contrast", "--contrast")]:
+                          ("cover", "--cover"), ("safe", "--safe"), ("contrast", "--contrast"),
+                          ("intro", "--intro"), ("intro_sound", "--intro-sound"), ("intro_db", "--intro-db"),
+                          ("intro_seconds", "--intro-seconds"), ("lead", "--lead"), ("rewind_sfx", "--rewind-sfx"),
+                          ("voice_db", "--voice-db"), ("voice_clean", "--voice-clean"), ("loudness", "--loudness")]:
             if (r.get(col) or "").strip(): cmd += [flag, r[col].strip()]
         if yes(r.get("beat_rewind", "")): cmd.append("--beat-rewind")
         if yes(r.get("blend", "")): cmd.append("--blend")

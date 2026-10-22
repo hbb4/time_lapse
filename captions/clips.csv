@@ -1,2 +1,2 @@
-name,passage,recording,folder,from,to,move,style,aspect,fit,ending,music,music_start,music_db,end_boost_db,trails,exposure,beat_punch,beat_rewind,fx_every,end_card,end_card_seconds,end_card_sound,cover,safe,contrast,blend
-fog_gathers,captions/passages/fog_gathers.txt,captions/recordings/fog_gathers.m4a,,2026-09-21 17:45,2026-09-21 20:35,push,serif,9x16,,rewind,captions/music/track01.mp3,0:06,-16,6,0.5,1,0,yes,,,,,auto,,,
+name,passage,recording,folder,from,to,move,style,aspect,fit,ending,music,music_start,music_db,end_boost_db,trails,exposure,beat_punch,beat_rewind,fx_every,end_card,end_card_seconds,end_card_sound,cover,safe,contrast,blend,intro,rewind_sfx,voice_db,loudness
+fog_gathers,captions/passages/fog_gathers.txt,captions/recordings/fog_gathers.m4a,,2026-09-21 17:45,2026-09-21 20:35,push,serif,9x16,,rewind,captions/music/track01.mp3,0:06,-16,6,0.5,1,0,yes,,,,,auto,,,,gust,,,

@@ -10,6 +10,7 @@ captions/
   passages/       one .txt per passage: the "formatted script" (text + directions, see the key below)
   recordings/     your readings (m4a / mp3 / wav), named to match the passage
   music/          instrumental tracks
+  sfx/            your own sound effects (optional): gust.wav, fog.wav... replace the synthesized openers
   clips.csv       the clip sheet: one row per video
   match.py        pairs passages with footage and writes a clip sheet for you
   batch.py        renders every row of a clip sheet
@@ -17,6 +18,7 @@ captions/
   align.py        finds when each word is spoken in your recording
   markup.py       reads the formatted script
   styles.py       the caption looks
+  intro.py        opening sound + screen effects (section 4b)
 ```
 
 Finished clips go to `/Volumes/CORSAIR/ATLI_videos_and_stills/_captions/`.
@@ -156,6 +158,15 @@ asking anyone, the evening lets it go.
 | `cover` | `auto`, a time like `12.5`, `none` | `auto` | saves `name_9x16_cover.jpg` and embeds it as the file's thumbnail (section 4a) |
 | `safe` | `on`, `off` | `on` | vertical clips: captions stay clear of the app buttons and text (section 4a) |
 | `contrast` | `on`, `off` | `on` | over a bright background, the words get a darker, wider shadow and a soft dark halo (section 4a) |
+| `intro` | `gust`, `fog`, `rush`, `dark`, `none` | `none` | opening sound with a matching screen effect; the reading waits for it (section 4b) |
+| `intro_sound` | path | `sfx/<intro>.*`, else synthesized | the opener's sound |
+| `intro_db` | dB | per intro (about −4) | opener sound level (before loudness) |
+| `intro_seconds` | seconds | per intro (1.1 to 2) | how long the screen effect lasts |
+| `lead` | seconds | per intro (0.9 to 1.6) | when your reading starts; `0` puts the voice over the opener |
+| `rewind_sfx` | path, `whoosh`, `wind` | none | a sound at the rewind; whoosh/wind are synthesized, played reversed so they swell into it |
+| `voice_db` | dB | `0` | your reading's level against the music and effects |
+| `voice_clean` | `on`, `off` | `on` | rumble cut below 80 Hz, light hiss removal, gentle compression (`VOICE_CLEAN` in render.py) |
+| `loudness` | LUFS | `-14` | the finished clip's loudness; −14 is what TikTok, Reels and YouTube play at. `0` leaves the mix as is |
 
 ### 4a. Cover, safe area and contrast
 
@@ -179,6 +190,37 @@ sky nothing changes. As it gets brighter (fog, white cloud, the sun low in the f
 darker and wider and a soft dark halo builds behind the words, easing over about half a second so it never
 flickers. The words keep their style's colors. Tune it in `brightness()` (when it starts: 0.35) and
 `draw_words()` (how strong).
+
+### 4b. Sound: the opener, your voice and the mix
+
+**Openers.** `intro` puts a sound at the very start of the clip with a screen effect made for it. The
+picture starts hidden and clears as the sound passes: the clearing follows the sound itself (how much of it
+has played), so a different sound file stays in sync without retiming anything. Your reading starts at
+`lead` seconds, as the gust settles; captions and the footage span shift with it.
+
+| Intro | Sound | Screen |
+|---|---|---|
+| `gust` | a wind gust sweeping left to right | the picture streaks sideways (motion blur), glides in from the left and settles |
+| `fog` | soft, breathy wind | the picture emerges from a pale haze, blur dissolving |
+| `rush` | a fast whoosh | a zoom blur rushes in from the centre and pulls back to the scene |
+| `dark` | a low swell of air | fades up from black, soft at first |
+
+The built-in sounds are synthesized placeholders (filtered noise). To use a real one, save it in
+`captions/sfx/` named after the intro (`sfx/gust.wav`, `sfx/fog.m4a`...) and every clip with that intro
+picks it up, or point one clip at a file with `intro_sound`. Trim silence off the front of the file: the
+effect starts at the first frame. `python captions/intro.py some_folder` writes the placeholders as wav files
+so you can hear them. Add a new opener as a row in `INTROS` in intro.py (sound + look + timings).
+
+**Your recordings.** Put them in `captions/recordings/`, named like the passage (`fog_gathers.m4a`). A
+phone voice memo is fine: by default the voice is cleaned up (rumble cut, light hiss removal, gentle
+compression so quiet lines aren't lost under the music). Record in a quiet room, phone about a hand's width
+from your mouth and a little to the side, and leave a second of silence before you start. `voice_clean off`
+skips the cleanup if you record with a good mic.
+
+**The mix.** Opener at t=0, voice from `lead`, music at `music_db` underneath from t=0, rising by
+`end_boost_db` after the reading, then the whole clip is set to −14 LUFS with one fixed gain (peaks kept
+under −1 dB), so every clip plays at the same level. To change only levels, run render.py with `--remix`
+(the opener's screen effect is part of the video, so changing `intro` needs a full render).
 
 ## 5. Caption styles
 
@@ -240,16 +282,18 @@ match.py picks from all ranked days.
 | Ending | render.py flags `--pause` (0.1 s), `--rewind-seconds` (2), `--hold-seconds` |
 | Mood words and clip types | `match.py` `MOODS`, `RECIPE_FOR`, `ANCHOR` |
 | Reading pace / long-form threshold | `match.py --wpm`, `--long-seconds` |
+| Opener presets (sound, look, length, when the reading starts, level) | `intro.py` `INTROS`; looks are `streak`, `haze`, `zoom`, `fade`; placeholder sounds in `synth()` |
+| Voice cleanup | `render.py` `VOICE_CLEAN` (ffmpeg filters) |
 | How hard renders push the Mac | `batch.py` / `render.py --threads` (default 2, at low priority with background QoS; 0 = full speed). Rows render one at a time. |
 
 ## 9. Things that could add to this
 
-Built: the end card (`end_card`), safe area, cover and contrast are in section 4. On hold: variations.
+Built: the end card (`end_card`), safe area, cover and contrast are in section 4; openers, voice cleanup
+and loudness in section 4b. On hold: variations.
 Not built yet:
 
 - **Auto attribution:** "— Author, Title" written over the rewind from captions.csv, no card needed.
 - **Subtitle file (.srt):** written next to each clip from the word timings, for YouTube and accessibility.
-- **Loudness:** normalize to about −14 LUFS so every clip plays at the same level on the platforms.
 - **Room tone:** a quiet city / window ambience bed under the voice.
 - **Chapters for long form:** YouTube chapter markers at stanza or section breaks.
 - **Variations (on hold):** render one passage two or three ways (style, day, music) to compare.

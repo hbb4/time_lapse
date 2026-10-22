@@ -6,14 +6,15 @@ faster span skips whole frames, and a span shorter than the reading repeats fram
 spans so that doesn't happen). --blend brings back the blended look; --exposure > 1 blends on purpose.
 Renders run gently by default (lower priority, background QoS on macOS, 2 threads); --threads 0 = full speed. Optional light trails, beat-synced zoom punches, *stressed* words
 (shown alone on screen) and captions placed on surfaces in the scene (roof edge, walls) via passage markup
-(see markup.py). Caption looks live in styles.py (--style).
+(see markup.py). Caption looks live in styles.py (--style). An opening sound with a matching screen effect
+(--intro gust/fog/rush/dark, intro.py) plays before the reading starts.
 
 Demo: frames 380-1650 of TLST05B01403_260921165611 (Sep 21 2026, 17:47-20:36, 8 s interval).
 """
 import argparse, json, os, subprocess, sys, wave
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
-import markup, styles
+import intro, markup, styles
 
 FPS = 30
 W, H = 1080, 1920                      # set by --aspect
@@ -511,9 +512,14 @@ def build_timeline(n_src, reading_end, a, downbeats):
     return tl, end_at
 
 # ---------- audio: everything in numpy so levels are exact and predictable ----------
-def load_audio(path, start=0.0, dur=None):
+# Voice cleanup for phone / laptop recordings: cut rumble below 80 Hz, take off steady hiss, then even out
+# loud and soft words a little (gentle 3:1 compression) so quiet lines aren't lost under the music.
+VOICE_CLEAN = "highpass=f=80,afftdn=nr=10:nf=-45,acompressor=threshold=-22dB:ratio=3:attack=8:release=180:makeup=4dB"
+
+def load_audio(path, start=0.0, dur=None, af=None):
     cmd = ["ffmpeg", "-v", "error", "-ss", str(start), "-i", path]
     if dur: cmd += ["-t", str(dur)]
+    if af: cmd += ["-af", af]
     cmd += ["-ac", "2", "-ar", str(SR), "-f", "f32le", "-"]
     raw = subprocess.run(cmd, capture_output=True, check=True).stdout
     return np.frombuffer(raw, np.float32).reshape(-1, 2).copy()
@@ -528,12 +534,21 @@ def has_audio(path):
                         "-of", "csv=p=0", path], capture_output=True, text=True)
     return bool(r.stdout.strip())
 
-def build_audio(voice, out_wav, total_s, reading_end, a, rewind_at, card_at=None):
-    """Voice from t=0. Music from t=0 at one steady level, rising after the reading, fading at the very end.
-    The end card (if any) starts at card_at: the music carries on through it, unless --end-card-sound says
-    "own" (the card's own sound, music fades out) or names a sound file (played on top of the music)."""
+def build_audio(voice, out_wav, total_s, reading_end, a, rewind_at, card_at=None, opener=None):
+    """Opening sound (if any) at t=0, voice after the opener's lead (t=0 without one). Music from t=0 at one
+    steady level, rising after the reading, fading at the very end. The end card (if any) starts at card_at:
+    the music carries on through it, unless --end-card-sound says "own" (the card's own sound, music fades
+    out) or names a sound file (played on top of the music). Then the whole mix is set to --loudness."""
     n = int(total_s * SR)
-    mix = fit(load_audio(voice), n) if voice else np.zeros((n, 2), np.float32)
+    mix = np.zeros((n, 2), np.float32)
+    if voice:
+        v = load_audio(voice, af=VOICE_CLEAN if a.voice_clean == "on" else None) * db(a.voice_db)
+        i = int(round((opener.lead if opener else 0) * SR))
+        v = v[: max(0, n - i)]
+        mix[i:i + len(v)] += v
+    if opener is not None and opener.audio is not None:
+        s = opener.audio[:n] * db(opener.db)
+        mix[:len(s)] += s
     if a.music:
         m = fit(load_audio(a.music, a.music_start, total_s + 1), n)
         t = np.arange(n) / SR
@@ -545,9 +560,13 @@ def build_audio(voice, out_wav, total_s, reading_end, a, rewind_at, card_at=None
             m[i:i + f] *= np.linspace(1, 0, len(m[i:i + f]))[:, None]; m[i + f:] = 0
         f = int(0.8 * SR); m[-f:] *= np.linspace(1, 0, f)[:, None]
         mix += m
-    if a.rewind_sfx and rewind_at is not None:          # optional sound of your own, on top of the music
+    if a.rewind_sfx and rewind_at is not None:          # optional sound on top of the music
         i = int(rewind_at * SR)
-        fx = load_audio(a.rewind_sfx)[: n - i] * db(a.music_db + a.end_boost_db)
+        if a.rewind_sfx in ("whoosh", "wind"):          # synthesized (intro.py), reversed so it swells into the rewind
+            fx = intro.synth(a.rewind_sfx)[::-1][: n - i] * db(a.music_db + a.end_boost_db + 4)
+            i = max(0, i - int(0.25 * SR))
+        else:
+            fx = load_audio(a.rewind_sfx)[: n - i] * db(a.music_db + a.end_boost_db)
         mix[i:i + len(fx)] += fx
     if card_at is not None and a.end_card_sound != "music":
         i = int(card_at * SR)
@@ -562,6 +581,23 @@ def build_audio(voice, out_wav, total_s, reading_end, a, rewind_at, card_at=None
     with wave.open(out_wav, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR)
         w.writeframes((mix * 32767).astype(np.int16).tobytes())
+    if a.loudness: normalize(out_wav, a.loudness)
+
+def normalize(wav, target):
+    """Set the clip's overall loudness (LUFS, e.g. -14 as TikTok, Reels and YouTube play it) with one fixed
+    gain, peaks kept under -1 dBTP. Measures first, then applies, so nothing pumps or squashes."""
+    import re
+    r = subprocess.run(["ffmpeg", "-v", "info", "-i", wav, "-af", f"loudnorm=I={target}:TP=-1:LRA=20:print_format=json",
+                        "-f", "null", "-"], capture_output=True, text=True)
+    m = json.loads(re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", r.stderr).group(0))
+    if float(m["input_i"]) < -70: return                # silent
+    tmp = wav.replace(".wav", ".norm.wav")
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", wav, "-af",
+                    f"loudnorm=I={target}:TP=-1:LRA=20:linear=true:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
+                    f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}",
+                    "-ar", str(SR), "-c:a", "pcm_s16le", tmp], check=True)
+    os.replace(tmp, wav)
+    print(f"loudness: {float(m['input_i']):.1f} -> {target} LUFS")
 
 def mux(video, audio_wav, out, cover=None):
     """Video + mix -> out. A cover image is embedded as the file's thumbnail (what Finder/Photos show)."""
@@ -683,7 +719,9 @@ DIRECTIVE_FLAGS = {"style": "style", "move": "move", "aspect": "aspect", "fit": 
                    "cover": "cover", "safe": "safe", "contrast": "contrast",
                    "music": "music", "music_start": "music_start", "music_db": "music_db", "end_boost_db": "end_boost_db",
                    "trails": "trails", "exposure": "exposure", "fx_every": "fx_every", "beat_punch": "beat_punch",
-                   "pause": "pause", "rewind_seconds": "rewind_seconds"}
+                   "pause": "pause", "rewind_seconds": "rewind_seconds", "rewind_sfx": "rewind_sfx",
+                   "intro": "intro", "intro_sound": "intro_sound", "intro_db": "intro_db", "intro_seconds": "intro_seconds",
+                   "lead": "lead", "voice_db": "voice_db", "voice_clean": "voice_clean", "loudness": "loudness"}
 
 def apply_directives(a, ap):
     """"@name value" lines at the top of the passage set the same options as the command line."""
@@ -723,8 +761,14 @@ def main(a):
                      max_words=9, y=0.8, stress_size=STYLE["stress_size"] * 0.9, fx_every=STYLE["fx_every"] * 1.6)
     if a.fx_every is not None: STYLE["fx_every"] = a.fx_every
     print(f"caption style: {STYLE['name']}")
+    opener = None
+    if a.intro != "none":
+        opener = intro.Intro(a.intro, load_audio, a.intro_sound, a.intro_db, a.intro_seconds, a.lead, FPS)
+        print(f"intro: {a.intro}, sound {opener.source}, reading starts at {opener.lead:.1f}s")
     if a.words:
         words = json.load(open(a.words))
+        if opener:                                      # the reading waits for the opener
+            words = [dict(w, start=w["start"] + opener.lead, end=w["end"] + opener.lead) for w in words]
         if a.text: words = markup.apply(words, open(a.text).read())
         phrases = group(words, auto_fx=not a.no_auto_fx)
         reading_end = words[-1]["end"] + 0.3
@@ -780,6 +824,7 @@ def main(a):
                 tr = fr.trails(pos, a.trail_decay)
                 img = img + a.trails * (np.maximum(img, tr) - img)
             bg = Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).resize((W, H), Image.BICUBIC, box=box)
+            if opener: bg = opener.frame(bg, i)
             frame = bg.convert("RGBA")
             if captions and phrases:
                 frame = Image.alpha_composite(frame, caption_layer(t, phrases, cap_cache, box, bg=bg))
@@ -807,7 +852,7 @@ def main(a):
             print(f"cover: {cover} (source frame {k}, {at:.1f}s into the clip)")
 
     wav = a.out.replace(".mp4", ".mix.wav")
-    build_audio(a.voice, wav, total_s, reading_end, a, rewind_at, card_at)
+    build_audio(a.voice, wav, total_s, reading_end, a, rewind_at, card_at, opener)
     mux(silent, wav, a.out, cover if cover and os.path.exists(cover) else None)
     print(f"{a.out}: {total_s:.1f}s, reading ends {reading_end:.1f}s"
           + (f", rewind {rewind_at:.1f}-{rewind_at + a.rewind_seconds:.1f}s" if rewind_at else ""))
@@ -852,7 +897,19 @@ def parser():
     ap.add_argument("--pause", type=float, default=0.1, help="seconds after the last word before the ending starts")
     ap.add_argument("--rewind-seconds", type=float, default=2.0)
     ap.add_argument("--hold-seconds", type=float, default=0.5, help="end frame length (after rewind, or the hold ending)")
-    ap.add_argument("--rewind-sfx", help="optional sound file played at the rewind (none by default)")
+    ap.add_argument("--rewind-sfx", help='optional sound at the rewind: a file, or "whoosh" / "wind" (synthesized, '
+                    'reversed so it swells into the rewind). None by default')
+    ap.add_argument("--intro", choices=sorted(intro.INTROS), default="none",
+                    help="opening sound + matching screen effect (intro.py): gust, fog, rush, dark")
+    ap.add_argument("--intro-sound", help="sound file for the opener (default: captions/sfx/<intro>.*, else synthesized)")
+    ap.add_argument("--intro-db", type=float, help="opener sound level, dB (default per preset, about -4)")
+    ap.add_argument("--intro-seconds", type=float, help="how long the screen effect lasts (default per preset)")
+    ap.add_argument("--lead", type=float, help="seconds before the reading starts (default per preset; 0 = voice over the opener)")
+    ap.add_argument("--voice-db", type=float, default=0.0, help="voice level, dB")
+    ap.add_argument("--voice-clean", choices=["on", "off"], default="on",
+                    help="rumble cut, light hiss removal and gentle compression on the reading (VOICE_CLEAN)")
+    ap.add_argument("--loudness", type=float, default=-14.0,
+                    help="final loudness in LUFS (-14 is what the apps play at; 0 = leave the mix as is)")
     ap.add_argument("--remix", action="store_true", help="reuse the existing render, only redo the audio")
     ap.add_argument("--end-card", help="image, GIF or video shown after the ending, e.g. an author/title card "
                     "(off unless given; made in the clip's shape, 1080x1920 or 1920x1080, anything else is cropped to fill)")
