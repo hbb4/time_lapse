@@ -18,7 +18,10 @@ when missing. Example (examples/mock_pick.json):
       "price_cents": 34,                          # entry price
       "model_prob": 0.52,                         # the model's probability for the side taken
       "record": {"wins": 41, "losses": 23},       # the picks' running record (or a string, "41-23")
-      "drivers": ["Forecast blend 71.7°F", ...],  # up to 3 short lines from the blend details
+      "blend_mean": 71.7,                         # the forecast blend's mean, and the market's consensus
+      "market_consensus": 70.9,                   #   (implied mean): always the first bullet
+      "unit": "°F",
+      "drivers": ["...", ...],                    # further bullets (the video shows one after the blend)
       "ticker": "KXHIGHNY-26OCT15-B71.5",
       "handle": "@yourhandle",
       "disclaimer": "Not financial advice."
@@ -46,6 +49,9 @@ class Pick:
     forecast_at: str = ""
     placed_at: str = ""
     price_history: list = field(default_factory=list)
+    blend_mean: Optional[float] = None
+    market_consensus: Optional[float] = None
+    unit: str = "°F"
     model_prob: Optional[float] = None
     drivers: list = field(default_factory=list)
     record: object = None
@@ -103,6 +109,19 @@ class Pick:
         if b: parts.append(f"Bet {stamp(b, with_date=not f or f.date() != b.date())}")
         return " · ".join(parts)
 
+    def blend_line(self):
+        """'Forecast blend 71.7°F, warmer than the market consensus of 70.9°F'; '' without a blend mean."""
+        if self.blend_mean is None: return ""
+        s = f"Forecast blend {self.blend_mean:.1f}{self.unit}"
+        if self.market_consensus is None: return s
+        diff = round(self.blend_mean - self.market_consensus, 1)
+        rel = "warmer than" if diff > 0 else "colder than" if diff < 0 else "in line with"
+        return f"{s}, {rel} the market consensus of {self.market_consensus:.1f}{self.unit}"
+
+    def bullets(self):
+        """The blend line first, then the other drivers."""
+        return [x for x in [self.blend_line()] + list(self.drivers) if x]
+
     def headline(self):
         """'YES 71° to 72° @ 34¢'"""
         return " ".join(x for x in (self.side_label, self.outcome) if x) + f" @ {self.price_cents:g}¢"
@@ -114,7 +133,7 @@ class Pick:
         if self.record_text(): lines.append(f"Picks record: {self.record_text()}")
         if self.model_prob is not None:
             lines.append(f"Model {self.model_prob * 100:.0f}% vs market {self.price_cents:g}% (edge {self.edge_pts:+d} pts)")
-        lines += [f"· {d}" for d in self.drivers[:3]]
+        lines += [f"· {d}" for d in self.bullets()[:3]]
         if self.disclaimer: lines.append(self.disclaimer)
         return "\n".join(lines)
 

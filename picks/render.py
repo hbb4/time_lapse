@@ -12,8 +12,9 @@ From Python (serving_quant):
 What is on screen, in order (default 15 s), all in the lower part of the frame so the sky stays clear:
   0.1 s  PICK OF THE DAY, the exchange with the forecast and bet times (UTC), the market title with
          its target date
-  0.4 s  the position screenshot pops in
-  5.4 s  it gives way to the pick, and the picks' record pops in on a gold badge: side and price, model vs market vs edge, and up to 2 forecast drivers
+  0.3 s  the pick panel: side and price, model / market ask / estimated edge, the blend bullet and one
+         more; the picks' record on a gold badge
+  5.4 s  it gives way to the position figure
   -2.6 s  everything clears to the record (large), the handle and the disclaimer
 No voice. Music, when given, is trimmed to the clip with a short fade in and a longer fade out.
 Next to OUT it also writes OUT_cover.jpg (the stats moment, for the post thumbnail) and OUT.txt
@@ -175,17 +176,18 @@ def scrim():
 SHOT_W = 520          # screenshot width on screen: small enough to leave the sky clear
 BOTTOM = 1695         # where the box ends (px from the top). Blake's pick: low in the frame, which runs into
                       # the apps' caption area (the bottom 480 px); 1470 keeps it clear of that
-T_STATS = 5.4         # when the screenshot gives way to the pick (it is up from 0.4 s, so about 5 s)
+T_SWAP = 5.4          # the pick panel is up first; at this point it gives way to the position figure
 INK = (34, 24, 8)     # dark text on the gold record badge
 
 
 def build(p, shot, seconds, max_drivers=2):
-    """Everything sits in the lower part of the frame, bottom-aligned just above the apps' caption area:
-    header and record, title, then the screenshot. At t_stats the screenshot gives way to the shorter pick
-    panel and the header and title glide down to sit on top of it."""
+    """Everything sits in the lower part of the frame, bottom-aligned at BOTTOM: header, title, then the
+    pick panel first (with the record badge). At t_swap the panel gives way to the taller position figure
+    and the header and title glide up to sit on top of it."""
     L, T, R, B = SAFE
     tw, bot = R - L, BOTTOM
-    t_stats, t_end = T_STATS, seconds - 2.6
+    t_swap, t_end = T_SWAP, seconds - 2.6
+    t_in, t_out = 0.3, t_swap - 0.25                       # the pick panel
 
     # the pick panel, measured first so the header can glide onto it
     col = SIDE_COLOR.get(p.side, ACCENT)
@@ -195,16 +197,16 @@ def build(p, shot, seconds, max_drivers=2):
     stats = []
     if p.model_prob is not None:
         e = p.edge_pts
-        stats = [("MODEL", f"{p.model_prob * 100:.0f}%", WHITE), ("MARKET", f"{p.price_cents:g}%", WHITE),
-                 ("EDGE", f"{e:+d}", UP if e > 0 else DOWN)]
-    drivers = [text_el("•  " + d, "bold", 32, WHITE, max_w=tw - 40) for d in p.drivers[:max_drivers]]
+        stats = [("MODEL", f"{p.model_prob * 100:.0f}%", WHITE), ("MARKET ASK", f"{p.price_cents:g}¢", WHITE),
+                 ("ESTIMATED EDGE", f"{e:+d}", UP if e > 0 else DOWN)]
+    drivers = [text_el("•  " + d, "bold", 32, WHITE, max_w=tw - 40) for d in p.bullets()[:max_drivers]]
     panel_h = 22 + pill.height + (26 + 128 if stats else 0) + sum(d.height + 4 for d in drivers) + 18
     panel_top = bot - panel_h
 
     shot_h = int(SHOT_W * shot.height / shot.width)
     shot_top = bot - shot_h
     glide = panel_top - shot_top
-    move = lambda t: glide * ease((t - t_stats) / 0.6)
+    move = lambda t: glide * (1 - ease((t - t_swap) / 0.6))
 
     title = text_el(p.title(), "heavy", 58, WHITE, max_w=tw)
     title_y = shot_top - 26 - title.height
@@ -219,23 +221,23 @@ def build(p, shot, seconds, max_drivers=2):
     els = [El(head, L, head_y + (head_h - head.height) // 2 + 4, 0.1, t_end, shift=move)]
     if rec:
         rx = L + head.width + 24 if L + head.width + 24 + rec.width <= R else L
-        els.append(El(rec, rx, head_y if rx > L else head_y - rec.height - 8, t_stats + 0.15, t_end, pop=True, fade=0.4,
-                      shift=move))    # with the pick, not over the screenshot
+        els.append(El(rec, rx, head_y if rx > L else head_y - rec.height - 8, 0.35, t_out, pop=True, fade=0.4,
+                      shift=move))    # with the pick panel, not over the figure
     if sub_el: els.append(El(sub_el, L, sub_y, 0.15, t_end, shift=move))
     els.append(El(title, L, title_y, 0.2, t_end, rise=30, shift=move))
 
     y = panel_top + 22
-    els.append(El(pill, CX, y, t_stats + 0.15, t_end, center=True, pop=True, fade=0.4))
+    els.append(El(pill, CX, y, t_in + 0.1, t_out, center=True, pop=True, fade=0.4))
     y += pill.height + 26
     if stats:
         colw = tw // 3
         for i, (k, v, c) in enumerate(stats):
             x = L + colw * i + colw // 2
-            els.append(El(text_el(k, "bold", 28, MUTED, tracking=3), x, y, t_stats + 0.35 + 0.1 * i, t_end, center=True))
-            els.append(El(text_el(v, "heavy", 62, c), x, y + 34, t_stats + 0.35 + 0.1 * i, t_end, center=True))
+            els.append(El(text_el(k, "bold", 24, MUTED, tracking=2), x, y + 4, t_in + 0.3 + 0.1 * i, t_out, center=True))
+            els.append(El(text_el(v, "heavy", 62, c), x, y + 34, t_in + 0.3 + 0.1 * i, t_out, center=True))
         y += 128
     for i, d in enumerate(drivers):
-        els.append(El(d, L + 20, y, t_stats + 0.8 + 0.25 * i, t_end, rise=16))
+        els.append(El(d, L + 20, y, t_in + 0.7 + 0.25 * i, t_out, rise=16))
         y += d.height + 4
     panel = (L - 24, panel_top, R + 24, bot)
 
@@ -252,12 +254,13 @@ def build(p, shot, seconds, max_drivers=2):
             ey += 80
     if p.handle: end.append(El(text_el(p.handle, "heavy", 64, WHITE), CX, ey + 20, t_end + 0.6, center=True)); ey += 110
     if p.disclaimer: end.append(El(text_el(p.disclaimer, "bold", 32, MUTED), CX, ey + 10, t_end + 0.75, center=True))
-    return dict(els=els + end, shot=(CX - SHOT_W // 2, shot_top, SHOT_W), panel=panel, t_stats=t_stats, t_end=t_end)
+    return dict(els=els + end, shot=(CX - SHOT_W // 2, shot_top, SHOT_W), panel=panel, t_in=t_in, t_out=t_out,
+                t_swap=t_swap, t_end=t_end)
 
 
 def draw_screenshot(frame, shot, lay, t):
-    """Pops in at 0.4 s, then shrinks and fades as the pick panel takes its place."""
-    t_in, t_out = 0.4, lay["t_stats"] - 0.1
+    """Pops in as the pick panel leaves, and stays until the end card."""
+    t_in, t_out = lay["t_swap"], lay["t_end"]
     a = ease((t - t_in) / 0.35) * (1 - ease((t - t_out) / 0.3))
     if a <= 0.01: return
     k = min(1.0, max(0.0, (t - t_in) / 0.4))
@@ -298,7 +301,7 @@ def render_pick_video(pick, screenshot, frames, out, music=None, music_start=0.0
     ff = subprocess.Popen(["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
                            "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-crf", str(crf), "-preset", "slow",
                            "-pix_fmt", "yuv420p", "-movflags", "+faststart", silent], stdin=subprocess.PIPE)
-    cover_at = int((lay["t_stats"] + 2.0) * FPS)
+    cover_at = int(3.0 * FPS)
     cover = out.replace(".mp4", "_cover.jpg")
     for i in range(n_out):
         t = i / FPS
@@ -310,7 +313,7 @@ def render_pick_video(pick, screenshot, frames, out, music=None, music_start=0.0
         k = ease(t / 0.8) * (1 - 0.4 * ease((t - lay["t_end"]) / 0.6))
         s = sc.copy(); s.putalpha(sc.getchannel("A").point(lambda v: int(v * k)))
         frame.alpha_composite(s)
-        frosted(frame, bg, lay["panel"], ease((t - lay["t_stats"]) / 0.3) * (1 - ease((t - lay["t_end"]) / 0.4)))
+        frosted(frame, bg, lay["panel"], ease((t - lay["t_in"]) / 0.3) * (1 - ease((t - lay["t_out"] - 0.1) / 0.3)))
         draw_screenshot(frame, shot, lay, t)
         for el in lay["els"]: el.draw(frame, t)
         rgb = frame.convert("RGB")
