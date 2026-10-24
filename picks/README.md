@@ -15,8 +15,10 @@ disclaimer. Text stays inside the area TikTok, Reels and Shorts leave clear of t
 python -m picks.render PICK.json SCREENSHOT.png FRAMES OUT.mp4 [--music track.mp3 --music-start 0:12 --music-db -3]
 ```
 
-- `PICK.json`: the pick (fields in `pick.py`; example in `examples/mock_pick.json`).
-- `SCREENSHOT.png`: the position as captured from the exchange, any size.
+- `PICK.json`: the pick (fields in `pick.py`; example in `examples/mock_pick.json`). Times are UTC.
+  `exchange` is `kalshi`, `polymarket_us` or `polymarket_global`; wording per exchange is in `exchanges.py`.
+- `SCREENSHOT.png`: the position figure, any size. The real one will be drawn from the 5-minute price
+  snapshots: price line up to the bet, a dashed vertical line at its end, bet time (UTC) at the lower right.
 - `FRAMES`: a text file of frame paths in order, or a folder of `TLS_*.jpg`. The whole list plays across
   the clip.
 - Writes `OUT.mp4`, `OUT_cover.jpg` (thumbnail at the stats moment) and `OUT.txt` (text for the post).
@@ -30,8 +32,8 @@ from picks import render_pick_video
 video, cover, text = render_pick_video(pick_dict, "position.png", frame_paths, "out/pick.mp4", music=None)
 ```
 
-No test screenshot handy? `python -m picks.mock_screenshot picks/examples/mock_pick.json mock.png` draws an
-unbranded stand-in marked MOCK.
+No figure yet? `python -m picks.mock_screenshot picks/examples/mock_pick.json mock.png` draws an unbranded
+stand-in marked MOCK in that layout (it plots `price_history` from the pick when given).
 
 ## Needs
 

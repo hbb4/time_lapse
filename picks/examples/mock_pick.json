@@ -1,7 +1,10 @@
 {
-  "date": "Thu Oct 15, 2026",
-  "exchange": "Kalshi",
+  "date": "2026-10-15",
+  "exchange": "kalshi",
   "market": "Highest temperature in NYC today",
+  "target_date": "2026-10-15",
+  "forecast_at": "2026-10-15T11:00:00Z",
+  "placed_at": "2026-10-15T11:07:00Z",
   "outcome": "71° to 72°",
   "side": "YES",
   "price_cents": 34,

@@ -10,9 +10,10 @@ From Python (serving_quant):
     render_pick_video(pick_dict, "position.png", frame_paths, "out/pick_2026-10-15.mp4")
 
 What is on screen, in order (default 15 s), all in the lower part of the frame so the sky stays clear:
-  0.1 s  PICK OF THE DAY with the picks' record on a gold badge, the date, the market title
+  0.1 s  PICK OF THE DAY, the exchange with the forecast and bet times (UTC), the market title with
+         its target date
   0.4 s  the position screenshot pops in
-  5.4 s  it gives way to the pick: side and price, model vs market vs edge, and up to 2 forecast drivers
+  5.4 s  it gives way to the pick, and the picks' record pops in on a gold badge: side and price, model vs market vs edge, and up to 2 forecast drivers
   -2.6 s  everything clears to the record (large), the handle and the disclaimer
 No voice. Music, when given, is trimmed to the clip with a short fade in and a longer fade out.
 Next to OUT it also writes OUT_cover.jpg (the stats moment, for the post thumbnail) and OUT.txt
@@ -205,20 +206,21 @@ def build(p, shot, seconds, max_drivers=2):
     glide = panel_top - shot_top
     move = lambda t: glide * ease((t - t_stats) / 0.6)
 
-    title = text_el(p.market + (f" · {p.event}" if p.event else ""), "heavy", 58, WHITE, max_w=tw)
+    title = text_el(p.title(), "heavy", 58, WHITE, max_w=tw)
     title_y = shot_top - 26 - title.height
     head = text_el("PICK OF THE DAY", "heavy", 34, ACCENT, tracking=5)
     rec = badge(p.record_text(), 32, ACCENT, INK) if p.record_text() else None
     head_h = rec.height if rec else head.height
-    sub = " · ".join(x for x in (p.date, p.exchange) if x)
-    sub_el = text_el(sub, "light", 32, MUTED) if sub else None
+    sub = " · ".join(x for x in (p.exch["name"], p.times_line()) if x)
+    sub_el = text_el(sub, "light", 32, MUTED, max_w=tw) if sub else None
     sub_y = title_y - 6 - (sub_el.height if sub_el else 0)
     head_y = sub_y - 8 - head_h
 
     els = [El(head, L, head_y + (head_h - head.height) // 2 + 4, 0.1, t_end, shift=move)]
     if rec:
         rx = L + head.width + 24 if L + head.width + 24 + rec.width <= R else L
-        els.append(El(rec, rx, head_y if rx > L else head_y - rec.height - 8, 0.25, t_end, pop=True, fade=0.4, shift=move))
+        els.append(El(rec, rx, head_y if rx > L else head_y - rec.height - 8, t_stats + 0.15, t_end, pop=True, fade=0.4,
+                      shift=move))    # with the pick, not over the screenshot
     if sub_el: els.append(El(sub_el, L, sub_y, 0.15, t_end, shift=move))
     els.append(El(title, L, title_y, 0.2, t_end, rise=30, shift=move))
 
